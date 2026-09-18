@@ -105,8 +105,8 @@ Each has an owner slot, a time estimate, and a definition of done. Numbered for 
 
 | # | Action | Time | Done when |
 |---|---|---|---|
-| **C1** | `v4l2-ctl -d /dev/video0 --list-formats-ext` — **only 2 of 4 CSI lanes are wired** | 5 min | We know which modes exist and whether 1920×1080@60 is among them |
-| **C2** | Solve the exposure problem: the image processor needs a graphics context, so a plain SSH session gives flat, un-exposed frames | 3 h | A properly exposed image in the configuration we will fly |
+| **C1** | ~~List the camera modes~~ **DONE 18 Sep.** Two modes exist: **3840×2160@30 and 1920×1080@60**. The two-lane wiring did not cost us 1080p60, so the spec's 75° figure applies to a mode we have. No lower-resolution sensor mode exists, so 640×360 has to come from scaling | 0 h | ✅ Done |
+| **C2** | ~~Solve the exposure problem~~ **CLOSED 18 Sep — there is no exposure problem.** Measured over plain SSH: correctly exposed 1920×1080 colour frames, auto-exposure converging in ~1 frame. The 3 h budgeted here is freed | 0 h | ✅ Done. `tools/test_camera_capture.py` measures exposure per run and will say so if this ever stops being true |
 | **C3** | Print a ChArUco board — 7×5, 36 mm square, 27 mm marker, `DICT_5X5_100` (their recipe, known to work) on something rigid and flat | 30 min | Board in hand |
 | **C4** | Calibrate our own cameras. Expect fx ≈ 425 at 640×360 | 1 h | Intrinsics and distortion per airframe, reprojection error < 0.5 px |
 | **C5** | **Set** the camera tilt to **20° up** on every airframe and verify with an inclinometer, then measure its position offset from the body origin | 30 min | Tilt reads 20 ± 1° on each airframe; offset in `SPEC.md` |

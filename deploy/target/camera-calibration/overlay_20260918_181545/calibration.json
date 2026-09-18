@@ -1,0 +1,153 @@
+{
+  "model": "opencv_pinhole",
+  "distortion_order": [
+    "k1",
+    "k2",
+    "p1",
+    "p2",
+    "k3"
+  ],
+  "image_width": 1920,
+  "image_height": 1080,
+  "camera_matrix": [
+    [
+      1396.0559287071999,
+      0.0,
+      992.43384763112
+    ],
+    [
+      0.0,
+      1396.423483219807,
+      462.63113808572996
+    ],
+    [
+      0.0,
+      0.0,
+      1.0
+    ]
+  ],
+  "distortion_coefficients": [
+    0.10071099367056262,
+    -0.33652739265321757,
+    -0.0033537222993324464,
+    0.007317446077364395,
+    0.3737774901599488
+  ],
+  "rms_reprojection_error_px": 0.6897620830182127,
+  "board_inner_corners": [
+    7,
+    10
+  ],
+  "square_size_m": 0.025,
+  "opencv_version": "4.8.0",
+  "views": [
+    {
+      "image": "/home/dcl/target/camera-calibration/overlay_20260918_181545/captures/frame_000.png",
+      "rms_px": 0.7177824378013611
+    },
+    {
+      "image": "/home/dcl/target/camera-calibration/overlay_20260918_181545/captures/frame_001.png",
+      "rms_px": 0.7805925607681274
+    },
+    {
+      "image": "/home/dcl/target/camera-calibration/overlay_20260918_181545/captures/frame_002.png",
+      "rms_px": 0.36898767948150635
+    },
+    {
+      "image": "/home/dcl/target/camera-calibration/overlay_20260918_181545/captures/frame_003.png",
+      "rms_px": 0.7504676580429077
+    },
+    {
+      "image": "/home/dcl/target/camera-calibration/overlay_20260918_181545/captures/frame_004.png",
+      "rms_px": 0.7588880658149719
+    },
+    {
+      "image": "/home/dcl/target/camera-calibration/overlay_20260918_181545/captures/frame_005.png",
+      "rms_px": 0.7755870223045349
+    },
+    {
+      "image": "/home/dcl/target/camera-calibration/overlay_20260918_181545/captures/frame_006.png",
+      "rms_px": 0.5093652606010437
+    },
+    {
+      "image": "/home/dcl/target/camera-calibration/overlay_20260918_181545/captures/frame_007.png",
+      "rms_px": 0.3153563439846039
+    },
+    {
+      "image": "/home/dcl/target/camera-calibration/overlay_20260918_181545/captures/frame_008.png",
+      "rms_px": 0.2316669523715973
+    },
+    {
+      "image": "/home/dcl/target/camera-calibration/overlay_20260918_181545/captures/frame_009.png",
+      "rms_px": 0.8690069317817688
+    },
+    {
+      "image": "/home/dcl/target/camera-calibration/overlay_20260918_181545/captures/frame_010.png",
+      "rms_px": 0.47336500883102417
+    },
+    {
+      "image": "/home/dcl/target/camera-calibration/overlay_20260918_181545/captures/frame_011.png",
+      "rms_px": 0.693823516368866
+    },
+    {
+      "image": "/home/dcl/target/camera-calibration/overlay_20260918_181545/captures/frame_012.png",
+      "rms_px": 0.9764226675033569
+    },
+    {
+      "image": "/home/dcl/target/camera-calibration/overlay_20260918_181545/captures/frame_013.png",
+      "rms_px": 0.48799800872802734
+    },
+    {
+      "image": "/home/dcl/target/camera-calibration/overlay_20260918_181545/captures/frame_014.png",
+      "rms_px": 0.6508670449256897
+    },
+    {
+      "image": "/home/dcl/target/camera-calibration/overlay_20260918_181545/captures/frame_015.png",
+      "rms_px": 0.6065050959587097
+    },
+    {
+      "image": "/home/dcl/target/camera-calibration/overlay_20260918_181545/captures/frame_016.png",
+      "rms_px": 0.9612205028533936
+    },
+    {
+      "image": "/home/dcl/target/camera-calibration/overlay_20260918_181545/captures/frame_017.png",
+      "rms_px": 0.5859447121620178
+    },
+    {
+      "image": "/home/dcl/target/camera-calibration/overlay_20260918_181545/captures/frame_018.png",
+      "rms_px": 0.9639031291007996
+    },
+    {
+      "image": "/home/dcl/target/camera-calibration/overlay_20260918_181545/captures/frame_019.png",
+      "rms_px": 0.9781928658485413
+    },
+    {
+      "image": "/home/dcl/target/camera-calibration/overlay_20260918_181545/captures/frame_020.png",
+      "rms_px": 0.6946606040000916
+    },
+    {
+      "image": "/home/dcl/target/camera-calibration/overlay_20260918_181545/captures/frame_021.png",
+      "rms_px": 0.36680713295936584
+    },
+    {
+      "image": "/home/dcl/target/camera-calibration/overlay_20260918_181545/captures/frame_022.png",
+      "rms_px": 0.4989947974681854
+    },
+    {
+      "image": "/home/dcl/target/camera-calibration/overlay_20260918_181545/captures/frame_023.png",
+      "rms_px": 0.6592803001403809
+    },
+    {
+      "image": "/home/dcl/target/camera-calibration/overlay_20260918_181545/captures/frame_024.png",
+      "rms_px": 0.7633600234985352
+    }
+  ],
+  "capture_settings": {
+    "width": 1920,
+    "height": 1080,
+    "fps": 30,
+    "sensor_id": 0,
+    "sensor_mode": 1,
+    "source": "http://127.0.0.1:8080/stream"
+  }
+}

@@ -166,7 +166,7 @@ the rest of the team can develop against `fake_fc.py` without the drone.
 | ID | Gap | What it means | Effort | Blocks |
 |---|---|---|---|---|
 | **B1** | Camera capture with real timestamps | Tools exist (`live-view-pts.py`, `frame-timestamps.py`). **But `cv2.VideoCapture` throws the hardware timestamp away** and gives arrival time with tens of ms of jitter. Use the GStreamer/`python3-gi` path for anything timing-sensitive | 4 h | Perception |
-| **B2** | **Image processor needs a display** ⚠ | Colour, auto-exposure and white balance run in NVIDIA's ISP, which needs a graphics context a plain SSH session doesn't have. Headless gives flat, dim, un-exposed frames **by design**. Either arrange a display context on the board or design the detector for minimally-processed frames | 4 h | Usable images in flight |
+| **B2** | ~~Image processor needs a display~~ **RESOLVED 18 Sep** | The guides say colour, auto-exposure and white balance need a graphics context that a plain SSH session has not got. **Measured on the race Orin, they work headless:** correctly exposed 1920×1080 colour, auto-exposure settling in ~1 frame, median pixel mean 104 with spread 62. No display context needed, no detector redesign needed. The 4 h is freed | 0 h | ✅ Done |
 | **B3** | **No deep-learning framework on the board** | The image ships OpenCV (GStreamer-enabled), NumPy, pyserial, python3-gi, pymavlink. No PyTorch. **The NumPy policy runtime is now mandatory, not a preference** — three matrix multiplies, ~50 lines. The detector needs the same treatment: export to ONNX and run via OpenCV's DNN module or TensorRT | 3 h | Plan A |
 | **B4** | **Never `pip install opencv-python`** | It silently replaces the GStreamer-enabled build; `cv2.VideoCapture(pipeline, cv2.CAP_GSTREAMER)` then returns False with no explanation | — | Camera pipeline |
 | **B5** | No gate counter | The "which gate is next" input has no source on the real drone | 1 day | Plan A |
@@ -482,7 +482,7 @@ stress harness, never with training reward** — training reward hid the 6 Sep c
 ## 7. Contingencies
 
 - **Link not working by end of Day 1** → this is now unlikely, since the protocol layer is the organizers' and is known-good. If it happens, the cause is almost certainly one of: the serial console not released (`setup_jetson_uart.sh --apply`), wrong port or baud, or the FC unpowered. Run `sudo ~/target/bringup-check.sh` and believe its last line. Escalate to the organizers — they wrote this stack and have diagnostics for it.
-- **Camera gives flat, dim, unusable images** → expected over a plain SSH session; the image processor needs a graphics context. Either arrange a display on the board or switch the detector to minimally-processed frames. Do not spend hours assuming the camera is broken.
+- **Camera gives flat, dim, unusable images** → **not what we measured on 18 Sep**; over plain SSH the image processor exposed correctly. So if you see flat frames, something has genuinely changed — check the capture mode and `tools/test_camera_capture.py`'s measured exposure line before assuming it is the known EGL limitation. It was not a limitation on this board.
 - **Detector unreliable on real gates** → fall back to the classical detector, tuned on site.
 - **Gate counter desynchronizes** → Plan B doesn't strictly need the gate number, only "is there a gate ahead and where". Prefer Plan B until the counter is proven.
 - **Plan A can't complete a lap by end of Day 4** → score with Plan B. A completed slow run beats a fast run that ends at gate 4.

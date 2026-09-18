@@ -147,7 +147,10 @@ install — but three constraints from their guide will otherwise eat an afterno
    framerate. Run `v4l2-ctl -d /dev/video0 --list-formats-ext` and treat that list as the truth.
    The spec's 75° field of view is quoted for 1920×1080 @ 60 fps — **if that mode isn't available,
    our calibration is wrong before we start.**
-2. **The image processor needs a graphics context.** Colour, auto-exposure and white balance run in
+2. **The image processor was expected to need a graphics context — measured 18 Sep, it does not.**
+   Colour, auto-exposure and white balance ran correctly over a plain SSH session on the race Orin.
+   The paragraph below records the documented behaviour, which we did not reproduce.
+   The guides say colour, auto-exposure and white balance run in
    NVIDIA's ISP, which fails over a plain SSH session with `Failed to initialize EGLDisplay` and
    falls back to a flat, dim software debayer. That is documented behaviour, not a broken camera.
    For flight we must either arrange a display context on the board or design for minimally-processed

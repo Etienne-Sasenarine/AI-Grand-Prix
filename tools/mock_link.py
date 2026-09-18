@@ -81,10 +81,16 @@ class MockLink:
         self._crc_errors = 0
         self._armed = False
         self.closed = False
+        #: How many times anything asked this link to actuate the aircraft.
+        #: Tools that claim to be read-only can then be *checked* rather than
+        #: trusted -- see test_camera_capture.py, which runs beside a pilot with
+        #: propellers on and must never command anything.
+        self.commands_received = 0
 
     # ------------------------------------------------------------- driving it
     def command(self, throttle: float, rates_rad_s=(0.0, 0.0, 0.0)) -> None:
         """What a transmitter would be sending. Not part of the MSPLink API."""
+        self.commands_received += 1
         self._throttle = float(min(max(throttle, 0.0), 1.0))
         self._rate_cmd = [float(r) for r in rates_rad_s]
 
