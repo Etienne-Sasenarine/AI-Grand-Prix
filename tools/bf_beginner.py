@@ -29,9 +29,24 @@ The constraint that shapes this
 -------------------------------
 **Do not cap power.** Measurement 3 is a full-throttle climb, and it is what
 settles a 3.5x ambiguity in the thrust model. A tool that quietly limits the
-throttle would corrupt that measurement, so the beginner settings go on a
-**separate profile and rate profile**, leaving the ones in use untouched. Flip a
-switch for toy mode; flip back for measurement.
+throttle would corrupt that measurement, so the stick and throttle settings go
+on a **separate rate profile**, leaving the one in use untouched.
+
+**The PID profile is a different matter, and the default here used to be
+wrong.** It was profile 1, on the reasoning "a spare slot". This board has no
+spare slots: our own dump (18 Sep) names them -- 0 is the vendor's 10-inch tune,
+**1 is the 5-inch tune**, **2 is the 8-inch tune, ours and the active one**, 3 is
+"8-inch Fiber". Writing the tilt limit to profile 1 and then telling the pilot to
+select it would have put an 8-inch aircraft on a 5-inch aircraft's PID gains
+(roll P 49 against 40, D 56 against 48). So the default is now **profile 2**. The
+two settings written there, the tilt limit and the levelling strength, only
+exist in the self-levelling modes, so ACRO -- and the trained policy, which
+flies in ACRO -- never sees them.
+
+**Prefer ``setup_angle_mode.py`` for the two things that matter most.** It
+assigns ANGLE as the pilot's default and sets the tilt limit over plain MSP
+messages, which do not wedge this flight controller. This tool goes through the
+CLI, which does (see Safety), and its one attempted write on 18 Sep did not land.
 
 The one exception is the throttle *curve*, which is the single biggest win here
 and costs nothing: expo reshapes where the stick is sensitive **without changing
@@ -241,6 +256,9 @@ def print_plan(found: dict, values: dict, lines: list, skipped: list,
     print("BEGINNER FLIGHT SETUP")
     print("=" * 72)
     print(f"  PID profile      {profile}   (tilt limit and levelling strength)")
+    if profile != 2:
+        print(f"  *** PID profile {profile} is NOT the 8-inch tune (that is profile 2).")
+        print("  *** Flying on it means flying another airframe's PID gains.")
     print(f"  Rate profile     {rateprofile}   (stick rates and throttle curve)")
     print(f"  Assumed hover    {hover:.0%} of throttle OUTPUT -- A GUESS until measurement 2")
     print()
@@ -286,7 +304,9 @@ def main() -> int:
     ap.add_argument("--dev", default=None,
                     help="serial device, e.g. /dev/ttyTHS1. Omitted or 'mock' "
                          "runs against the test double and writes nothing real")
-    ap.add_argument("--profile", type=int, default=1, help="PID profile to write")
+    ap.add_argument("--profile", type=int, default=2,
+                    help="PID profile to write. 2 is the 8-inch tune this airframe "
+                         "flies on; 1 is the vendor's 5-inch tune, NOT a spare slot")
     ap.add_argument("--rateprofile", type=int, default=1, help="rate profile to write")
     ap.add_argument("--hover", type=float, default=DEFAULT_HOVER,
                     help="hover throttle as a fraction of THROTTLE OUTPUT (what "

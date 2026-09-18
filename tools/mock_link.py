@@ -99,6 +99,20 @@ class MockLink:
         #: Aux channel overrides, {1-based RC channel: microseconds}. Lets a
         #: test drive the marker switch the pilot would flip.
         self.aux: dict = {}
+        #: PID profiles, shaped like the real airframe (full dump, 18 Sep): six
+        #: of them, **profile 2 active -- the 8-inch tune**; 0 is the vendor's
+        #: 10-inch tune and 1 the 5-inch one. ``level_limit`` (the ANGLE-mode
+        #: tilt limit, degrees) is 30 / 23 / 55 across the first three, which is
+        #: what lets ``setup_angle_mode.py`` find that byte without trusting
+        #: anybody's memory of the payload layout.
+        self.pid_profile = 2
+        #: Where the tilt-limit byte sits in the MSP_PID_ADVANCED reply. A test
+        #: can move it, to prove the tool finds it rather than assuming it.
+        self.level_limit_offset = 17
+        self._pid_advanced = None       # built lazily so a test can move the offset first
+        #: Fault switch: a write that also disturbs a byte it was not asked to.
+        self.pid_advanced_corrupts = False
+        self.profile_selects = 0
 
     # ------------------------------------------------------------- driving it
     def command(self, throttle: float, rates_rad_s=(0.0, 0.0, 0.0)) -> None:
@@ -209,7 +223,32 @@ class MockLink:
 
     def status(self):
         return {"cycle_time_us": 125, "i2c_errors": 0, "flight_mode_flags": 1,
-                "arming_flags": 0, "armed": self._armed}
+                "arming_flags": 0, "armed": self._armed,
+                "pid_profile": self.pid_profile}
+
+    def _pid_advanced_payloads(self) -> list:
+        """One MSP_PID_ADVANCED reply per PID profile.
+
+        Deliberately awkward, because the real one is: most bytes are identical
+        across profiles, a few differ for reasons that have nothing to do with
+        the tilt limit, one constant byte happens to equal 55, and one offset
+        carries 30 / 23 in the first two profiles and then an implausible 200 --
+        a decoy that matches the anchors and must be thrown out on range.
+        """
+        if self._pid_advanced is None:
+            limits = [30, 23, 55, 55, 55, 55]
+            other = [12, 40, 25, 25, 31, 31]          # differs per profile, not the limit
+            decoy = [30, 23, 200, 7, 7, 7]
+            out = []
+            for prof in range(6):
+                b = bytearray((7 * i + 3) % 251 for i in range(47))
+                b[5] = 55                              # constant 55: not the limit
+                b[8] = other[prof]
+                b[30] = decoy[prof]
+                b[self.level_limit_offset] = limits[prof]
+                out.append(b)
+            self._pid_advanced = out
+        return self._pid_advanced
 
     def fc_version(self):
         return "4.4.3"
@@ -257,6 +296,23 @@ class MockLink:
             return b""
         if cmd == 250:                                  # MSP_EEPROM_WRITE
             self.eeprom_writes += 1
+            return b""
+        if cmd == 94:                                   # MSP_PID_ADVANCED
+            return bytes(self._pid_advanced_payloads()[self.pid_profile])
+        if cmd == 95:                                   # MSP_SET_PID_ADVANCED
+            cur = self._pid_advanced_payloads()[self.pid_profile]
+            if len(payload) != len(cur):
+                raise ValueError("MSP_SET_PID_ADVANCED: wrong payload length")
+            cur[:] = payload
+            if self.pid_advanced_corrupts:
+                cur[2] ^= 0xFF
+            return b""
+        if cmd == 210:                                  # MSP_SELECT_SETTING
+            if self._armed or len(payload) < 1:
+                return b""                              # the real one ignores it when armed
+            if not payload[0] & 0x80 and payload[0] < 6:   # 0x80 = rate profile, not ours
+                self.pid_profile = payload[0]
+                self.profile_selects += 1
             return b""
         if cmd == 119:                                  # MSP_BOXIDS
             return bytes([0, 1, 2, 6, 27, 46, 7, 8, 13, 19, 20, 26, 30, 31, 32,
