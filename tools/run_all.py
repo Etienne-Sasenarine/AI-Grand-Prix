@@ -29,6 +29,8 @@ SUITES = [
     ("TEST 1 hover throttle", "test_hover.py", ["--self-test"]),
     ("TEST 2 max thrust", "test_max_thrust.py", ["--self-test"]),
     ("TEST 3 camera capture", "test_camera_capture.py", ["--self-test"]),
+    ("unattended flight recorder", "flight_recorder.py", ["--self-test"]),
+    ("flight analysis (RC marks)", "analyze_flight.py", ["--self-test"]),
 ]
 
 
