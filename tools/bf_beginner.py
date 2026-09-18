@@ -356,9 +356,15 @@ def main() -> int:
             cli.command(line)
         print(f"  wrote {len(lines)} settings; saving (the board will reboot)")
         cli.leave(save=True)
-        print("  saved. Waiting for the flight controller to come back...")
+        # Deliberately NOT "saved". On 18 Sep this printed "saved.", the board
+        # wedged during the write, and the settings were still not there after a
+        # power cycle -- MSP_SELECT_SETTING later showed rate profile 1 holding
+        # its original values. A save that is sent is not a save that landed.
+        print("  save command sent. Waiting for the flight controller...")
         if cli.verify_msp_returned():
             print("  it is answering MSP again.")
+            print("  NOTE: this proves the board came back, NOT that the settings")
+            print("  were written. Re-run --probe to confirm they are really there.")
         else:
             print()
             print("  *** IT IS NOT ANSWERING. The settings were saved, but the")
