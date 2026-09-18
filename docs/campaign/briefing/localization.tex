@@ -1,0 +1,229 @@
+%========================================================== GATE IDENTITY
+\section{Knowing which gate is which}\label{sec:identity}
+
+\subsection{The problem, and why it is not a perception problem}
+
+The policy is told which gate it is flying at. In the simulator that arrives for
+free. On the real course nothing publishes it, ten gates are identical
+\SI{2.7}{m} squares, and \textbf{we asked the organizers whether we may mark them
+and the answer was no}.
+
+Measured on our own course: \textbf{34\,\% of frames have two or more gates in
+view at once.} So ``look at the gate and recognise it'' is not available from
+appearance, ever.
+
+\begin{explain}[The reframe that makes this tractable]
+Gate identity is not a perception problem. It is a \textbf{localisation}
+problem. If you know where you are, identity is a lookup: project all ten gates
+from the map and see which one you are pointed at. If you do not know where you
+are, no amount of staring at an identical square will tell you.
+
+Every published system reaches the same conclusion and none of them tries to
+recognise gates individually.
+\end{explain}
+
+\subsection{What the policy actually reads}\label{sec:statevector}
+
+Worth stating explicitly, because the argument below turns on it. Each frame is
+51 numbers, and the policy reads \textbf{32 frames of history}, so 1632 inputs.
+
+\begin{table}[H]\centering\footnotesize
+\begin{tabularx}{\linewidth}{@{}p{1.6cm} p{3.1cm} X@{}}
+\toprule
+Index & Name & Meaning \\
+\midrule
+0--15 & \code{u0,v0 \dots u7,v7} & \textbf{Eight gate corners} as image positions, normalised by 640$\times$360. \textbf{$-1.0$ in both when not seen} \\
+16--23 & \code{vis0 \dots vis7} & Is that corner seen? 1.0 or 0.0 \\
+24--25 & \code{roll}, \code{pitch} & Attitude from the flight controller, radians \\
+26--28 & \code{gx, gy, gz} & Gyro rates, body NED, clipped $\pm$8\,rad/s \\
+29--31 & \code{vx, vy, vz} & Commanded body velocity, NED, clipped $\pm$20\,m/s \\
+32--49 & \code{gate0 \dots gate17} & \textbf{Which gate is next} --- one slot set to 1.0 \\
+50 & \code{lap\_frac} & Progress round the lap, $\mathrm{index}/17$ \\
+\bottomrule
+\end{tabularx}
+\caption{The 51-number observation frame. Verified against the training code element by element (Section~\ref{sec:built}).}
+\end{table}
+
+The eight corners are \textbf{one gate only} --- the one being flown at, not all
+ten. Corners 0--3 are the outer \SI{2.7}{m} frame, clockwise from top-left;
+corners 4--7 are the inner \SI{1.5}{m} opening in the same order. Having both
+rings is what encodes \emph{range}: their true sizes are known, so apparent size
+gives distance.
+
+Three things the policy is \textbf{not} given, which matter for what follows:
+no distance, no position or altitude or heading (roll and pitch but not yaw),
+and no sight of the \emph{next} gate. Everything beyond the gate in view comes
+from the one-hot label and what the network memorised in training.
+
+\begin{warnbox}[The consequence]
+Nothing in indices 0--31 distinguishes gate~3 from gate~8. All ten are identical
+squares. The \textbf{only} channel carrying course position is the one-hot in
+32--49 --- which is 576 of the 1632 numbers once the 32 history frames are
+counted, over a third of everything the network reads.
+\end{warnbox}
+
+\subsection{``The model will learn the order from simulation''}
+
+A reasonable-sounding proposal was put forward: label the gates in simulation,
+train on that, and the model will know the order on the real unlabelled gates.
+
+The mechanical objection is that the label is an \textbf{input}, not an output.
+Training with it does not teach the network the order; it teaches the network to
+\emph{depend on being told} the order. At run time something must still supply
+those 18 numbers, and a network cannot supply its own input.
+
+But that is an argument, and arguments lose to measurements. So we measured it.
+
+\paragraph{The experiment.} Gene's model, flown in \emph{his} simulator on
+\emph{his} track --- his gate positions, his \SI{90}{\degree} camera, the
+\SI{607.6}{g} drone --- the conditions where it works well. 512 drones at once,
+\SI{20}{s} each. Identical physics, course, camera and seed across all five runs.
+\textbf{The only thing changed is where the gate label comes from.}
+
+\begin{table}[H]\centering\footnotesize
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+Label source & \makecell{Gates per\\crash} & \makecell{Crashes /\\100 gates} & \makecell{Median\\lap} & \makecell{Laps\\completed} \\
+\midrule
+\textbf{Correct, as trained} & \textbf{26.9} & \textbf{3.4} & \textbf{7.45\,s} & \textbf{515} \\
+Stuck on the start gate & 1.8 & 51.5 & --- & 0 \\
+No label at all & 1.1 & 85.6 & --- & 0 \\
+Random label each frame & 1.1 & 72.9 & --- & 0 \\
+Off by one & 1.0 & 80.7 & --- & 0 \\
+\bottomrule
+\end{tabular}
+\caption{The gate label is load-bearing. Raw data in \nolinkurl{~/aigp/eval/ctx/}; reproduce with \nolinkurl{run_ctx.sh}.}\label{tab:ctx}
+\end{table}
+
+\begin{verdict}[What this settles]
+\begin{itemize}
+\item \textbf{With the correct label the model is healthy}: \SI{7.45}{s} laps,
+\SI{16}{m/s} at the gate, 515 complete laps, about 27 gates between crashes.
+Exactly the performance it always had.
+\item \textbf{Without a label it completes zero laps.} Not one, across any of the
+four broken conditions. It crashes after roughly one gate.
+\item ``Train with labels in simulation, then have nothing supplying them in
+reality'' \emph{is} the ``no label at all'' row.
+\item \textbf{Off-by-one is as bad as no label at all} (1.0 vs 1.1). This is not
+only an argument for having a gate counter --- it is an argument for the counter
+being \emph{right}. A counter that slips once is worth nothing.
+\item \textbf{A frozen counter is the least-bad failure} (1.8). So when
+confidence is lost, hold the last index rather than guess a new one. That is how
+ours is built.
+\end{itemize}
+\end{verdict}
+
+The instinct behind the proposal is not wrong, and is a real published
+technique --- but it requires \emph{changing how we train}, not merely training
+with labels present. Either drop the input entirely and force the network to
+infer position from its 32 frames of history, or train a teacher with the
+privileged label and distil it into a student that sees only what the drone
+sees. Both work. Both have the same weakness: when the network's internal guess
+is wrong there is no error signal, so it is confidently wrong. The approach
+below at least knows when it is lost.
+
+\subsection{What we build instead}
+
+The published systems --- Swift\X, AlphaPilot\X\ and the 2026 dual pose-graph
+work\X\ --- all share one shape: detect gate corners, solve a relative pose per
+gate, match against the \emph{known map} in metric space, and fuse into a filter.
+Swift states it plainly: each observation is assigned to ``the nearest gate in
+the known trajectory layout''.
+
+Two things we do differently, both because we measured rather than copied.
+
+\paragraph{No visual-inertial odometry.} Every one of those systems leans on VIO.
+We have one forward camera and a \SI{25}{W} budget. So we measured whether we
+need it: a gate is in view \textbf{75--79\,\%} of frames, the worst gap is
+\SI{1.5}{s} at \SI{5}{m/s}, and dead reckoning drifts \textbf{under a metre}
+across that gap --- against gates that are \SI{7.54}{m} apart. VIO would be
+solving a problem we do not have.
+
+\paragraph{Throw away the PnP rotation.} Planar PnP is ill-conditioned near
+head-on, which is where a racing drone spends its life. But we do not need its
+rotation: the flight controller already gives us attitude, far more accurately.
+
+\begin{table}[H]\centering\footnotesize
+\begin{tabular}{@{}lrrr@{}}
+\toprule
+Corner noise & Range & Full 6-DOF PnP & \textbf{PnP translation + FC attitude} \\
+\midrule
+2\,px & 8\,m & 2.12\,m & \textbf{0.09\,m} \\
+5\,px & 8\,m & 3.15\,m & \textbf{0.29\,m} \\
+10\,px & 12\,m & 6.81\,m & \textbf{1.38\,m} \\
+\bottomrule
+\end{tabular}
+\caption{Discarding the ill-conditioned half of the PnP solution is worth 23$\times$ at the operating point. This is not from the literature; it fell out of the accuracy test.}\label{tab:pnp}
+\end{table}
+
+\subsection{The pipeline}
+
+\begin{enumerate}
+\item \textbf{Detector} --- finds a gate's eight corners in the image.
+\emph{Still to be built; needs real footage.}
+\item \textbf{PnP} --- corners plus the known \SI{2.7}{m}/\SI{1.5}{m} geometry
+give range and bearing to the gate. Planar PnP returns two mirrored solutions;
+we pick by reprojection error and break ties with \textbf{gravity}, since gates
+stand vertically and we know which way is down.
+\item \textbf{Position} --- range and bearing, plus the flight controller's
+attitude, plus the gate's known map position, give \emph{where we are}.
+\item \textbf{Filter} --- carries position through the gaps by integrating thrust
+and attitude, corrected by each fix. It also estimates \textbf{thrust scale},
+which is what makes a barometer unnecessary --- and the barometer is unusable
+anyway with the props spinning.
+\item \textbf{Tracker} --- knowing where we are, project all ten gates and see
+which one is ahead. Advance on a confirmed crossing. Fill the 18 one-hot slots.
+\end{enumerate}
+
+In one line: \emph{the gate looks this big and sits here in frame} $\rightarrow$
+\emph{so it is \SI{8.3}{m} away, \SI{12}{\degree} left} $\rightarrow$ \emph{the
+map says that gate is at (12.19, 45.11)} $\rightarrow$ \emph{so I am at
+(10.4, 37.2)} $\rightarrow$ \emph{therefore this is gate 3} $\rightarrow$
+\emph{set slot 35 to 1.0}.
+
+\subsection{Evidence}\label{sec:built}
+
+\begin{table}[H]\centering\footnotesize
+\begin{tabularx}{\linewidth}{@{}p{4.3cm} X@{}}
+\toprule
+Check & Result \\
+\midrule
+Observation frame vs training code & \textbf{Exactly zero} difference, 51 numbers $\times$ 200 cases \\
+History stack vs training code & \textbf{Exactly zero} difference across 1632 numbers \\
+Projection vs training code & $3.9\times10^{-6}$\,px, zero visibility mismatches over 3200 corners \\
+Policy in NumPy vs PyTorch & $2.5\times10^{-6}$ max error on the real checkpoint, \SI{126}{\micro s} per inference \\
+Position, normal conditions & \textbf{0.88\,m median, 2.79\,m p95} against \SI{7.54}{m} gate separation \\
+\dots with 20\,\% thrust error & 0.88\,m / 2.79\,m (thrust scale learned 0.895 vs true 0.900) \\
+\dots drag model 2$\times$ wrong & 0.80\,m / 3.01\,m \\
+\dots 10\,px corner noise & 1.01\,m / 2.38\,m \\
+\dots \SI{7}{m} detector range & 0.77\,m / 2.29\,m \\
+\dots \SI{12}{m/s} flight & 0.77\,m / 1.57\,m \\
+Dead reckoning with no fixes & 88.9\,m / 177\,m --- useless alone, which is the point \\
+Gate counting, 17 conditions & 22/22 crossings, zero errors (50\,\% dropout, 20 false positives/s, \SI{100}{ms} latency, 1\,m pose noise) \\
+\bottomrule
+\end{tabularx}
+\caption{Everything above is reproducible with \code{python run\_all.py} in \nolinkurl{flight/}.}
+\end{table}
+
+\begin{warnbox}[The one known limit: heading drift]
+The position fix is computed \emph{using} our heading, so a wrong heading
+corrupts the fix directly and no filter can recover --- the measurement itself is
+wrong. Measured tolerance:
+
+\begin{center}\footnotesize
+\begin{tabular}{@{}lrrl@{}}
+\toprule
+Yaw drift & Median & p95 & \\
+\midrule
+\SI{0.05}{\degree\per\second} & 0.28\,m & 0.97\,m & fine \\
+\SI{0.5}{\degree\per\second} & 0.90\,m & 2.81\,m & fine \\
+\SI{1.0}{\degree\per\second} & 1.47\,m & 6.81\,m & \textbf{breaks} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+So it tolerates about \SI{0.5}{\degree\per\second} and fails near
+\SI{1}{\degree\per\second}. A calibrated Betaflight gyro should be an order of
+magnitude better than that, but this is now a specific number to \textbf{verify
+from the measurement flight} rather than assume.
+\end{warnbox}

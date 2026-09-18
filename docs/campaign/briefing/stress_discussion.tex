@@ -1,0 +1,43 @@
+
+\begin{table}[H]\centering\footnotesize
+\begin{tabularx}{\linewidth}{@{}Xrr@{}}
+\toprule
+One change at a time to Gene's model on Gene's own course (unchanged: 2 crashes per 100 gates) & \makecell{Crashes /\\100 gates} & $P$(2 laps) \\
+\midrule
+Thrust calibration $-$10\,\% & 58 & 0\,\% \\
+Latency 50\,ms & 55 & 0\,\% \\
+Real camera (fx 424) & 42 & 0\,\% \\
+Camera tilt $-$\SI{5}{\degree} & 32 & 0\,\% \\
+Spec drawing exactly (Gene's heights) & 16 & 2\,\% \\
+Scale only (Gene's map $\times$1.075) & 16 & 2\,\% \\
+Gates 20\,\% smaller & 11 & 7\,\% \\
+True course size & 10 & 10\,\% \\
+Slower airframe (40\,ms) & 10 & 11\,\% \\
+Gate placement $\pm$0.25\,m & 6 & 24\,\% \\
+Detector noise 2\,px & 5 & 30\,\% \\
+8-inch clearance & 3 & 52\,\% \\
+Correct gate heights only & 2 & 67\,\% \\
+\midrule
+Latency 100\,ms (rougher) & 95 & 0\,\% \\
+Vision 15\,Hz (rougher) & 13 & 5\,\% \\
+Detector noise 5\,px, 15\,\% missed (rougher) & 27 & 0\,\% \\
+Small bumps (rougher) & 3 & 53\,\% \\
+Gate placement $\pm$0.5\,m (rougher) & 15 & 3\,\% \\
+\midrule
+Mirror-image course (stress only) & 73 & 0\,\% \\
+Randomly generated course (stress only) & 47 & 0\,\% \\
+\bottomrule
+\end{tabularx}
+\caption{The sensitivity of Gene's model to single realistic factors, ranked.}\label{tab:sens}
+\end{table}
+
+\begin{verdict}[What the durability tests say about Gene's model]
+\begin{itemize}
+\item \textbf{Most damaging factors:} latency and thrust calibration. Just \textbf{50\,ms} of total delay (55 crashes per 100 gates), or a hover thrust \textbf{10\,\% weaker} than assumed (58), is enough to make two laps essentially impossible. The real Jetson$\rightarrow$MSP$\rightarrow$Betaflight path will have at least that much delay (another team budgets about 130\,ms), and hover thrust will only be known after measurement.
+\item \textbf{Camera model:} the real field of view (42) and a \SI{5}{\degree} tilt error (32) are next.
+\item \textbf{Course geometry:} scaling Gene's own map up by 7.5\,\%, with nothing else changed, raises crashes from 2 to 16 per 100 gates. About 60\,\% of those crashes are on the climb to the \emph{upper opening of the double gate}: the policy learned a manoeuvre timed to the exact distances it trained on. Heights alone do not matter (2).
+\item \textbf{Mild factors:} gate placement ($\pm$0.25\,m), detector noise (2\,px) and the larger 8-inch airframe are comparatively mild, at 6, 5 and 3 crashes per 100 gates.
+\item \textbf{It memorized this course.} On a mirrored or random course it crashes almost immediately (73 and 47). That is expected: its input includes ``which gate is next'', so it learns the course, not a general skill. This is fine for a fixed course only if every other detail of the course and the drone matches training.
+\item \textbf{Is the 7--8\,s lap time itself the problem?} Not directly; the speed is a symptom. The real problem is a policy optimized for an idealized plant with zero latency, exact thrust, and a camera and course that differ from reality. A retrain needs randomization of exactly the top factors above: latency (0--150\,ms), thrust scale ($\pm$15\,\%), camera tilt ($\pm$\SI{5}{\degree}), rate lag. It also needs the corrected camera and course (Section~\ref{sec:retrain}).
+\end{itemize}
+\end{verdict}

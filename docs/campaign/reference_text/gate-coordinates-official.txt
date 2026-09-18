@@ -1,0 +1,76 @@
+Drone Racing Track
+ Gate Layout & Coordinate Reference for Contestants
+ Bird's-eye view of the track. The blue line is the racing line; numbered
+ markers identify each gate. Grid squares are 16.4 ft.
+Coordinate System
+Track boundary: 85 ft wide (X) by 165 ft long (Y).
+Origin (0, 0): Top-left corner of the track boundary, as
+marked on the map.
+X axis: Measured to the right, along the top edge (0 to 85
+ft).
+Y axis: Measured downward on the map, along the left
+edge (0 to 165 ft).
+Gate position: X and Y give the center of each gate
+opening.
+Rotation: Direction of flight through the gate, measured
+clockwise from 0°. 0° = toward the top edge (decreasing
+Y), 90° = right (+X), 180° = down (+Y), 270° = left (−X).
+Race order: Gates are flown in numerical order, starting at
+Gate 1.
+Gate Center Positions
+ Gate
+ X (ft)
+ Y (ft)
+Rot. (°)
+Flight direction
+ 1
+START
+ 12.0
+ 71.0
+ 0
+ Up
+ 2
+ 16.0
+ 39.0
+ 0
+ Up
+ 3
+ 40.0
+ 17.0
+ 90
+ Right
+ 4
+ 72.0
+ 40.0
+ 180
+ Down
+ 5
+ 66.0
+ 70.0
+ 215
+ Down-left
+ 6
+ 41.0
+ 86.0
+ 90
+ Right
+ 7
+ 70.5
+ 106.6
+ 180
+ Down
+ 8
+ 60.0
+ 129.0
+ 215
+ Down-left
+ 9
+ 39.7
+ 147.7
+ 180
+ Down
+ 10
+ 13.0
+ 110.0
+ 0
+ Up

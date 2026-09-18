@@ -1,0 +1,798 @@
+\documentclass[10pt,a4paper]{article}
+\usepackage[margin=2.2cm]{geometry}
+\usepackage{lmodern}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{microtype}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{longtable}
+\usepackage{multirow}
+\usepackage{makecell}
+\usepackage{xcolor}
+\usepackage{siunitx}
+\usepackage{enumitem}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{float}
+\usepackage{caption}
+\usepackage{lastpage}
+\usepackage[most]{tcolorbox}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,shapes.geometric,fit,calc,backgrounds}
+\usepackage{listings}
+\usepackage[hidelinks]{hyperref}
+
+\definecolor{aigp}{HTML}{E8502F}
+\definecolor{ink}{HTML}{1F2A44}
+\definecolor{okgreen}{HTML}{2E7D32}
+\definecolor{warnamber}{HTML}{B26A00}
+\definecolor{badred}{HTML}{C62828}
+\definecolor{soft}{HTML}{F4F6FA}
+
+\sisetup{detect-all}
+\setlist{itemsep=2pt,topsep=3pt}
+\setlength{\parskip}{4pt}
+\setlength{\parindent}{0pt}
+\captionsetup{font=small,labelfont=bf}
+
+\titleformat{\section}{\Large\bfseries\color{ink}}{\thesection}{0.6em}{}
+\titleformat{\subsection}{\large\bfseries\color{ink}}{\thesubsection}{0.6em}{}
+\titleformat{\subsubsection}{\normalsize\bfseries\color{ink}}{\thesubsubsection}{0.6em}{}
+
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{\small\color{gray}AI Grand Prix PQ --- Onboarding \& Engineering Journal}
+\rhead{\small\color{gray}as of 16 Sep 2026}
+\cfoot{\small\color{gray}\thepage}
+\renewcommand{\headrulewidth}{0.3pt}
+
+\lstset{basicstyle=\ttfamily\footnotesize,backgroundcolor=\color{soft},frame=single,rulecolor=\color{gray!40},breaklines=true,columns=fullflexible,keepspaces=true,showstringspaces=false}
+
+\newtcolorbox{takeaway}[1][Key takeaways]{colback=aigp!6,colframe=aigp,fonttitle=\bfseries,title={#1},boxrule=0.6pt,arc=2pt,left=4pt,right=4pt,top=3pt,bottom=3pt}
+\newtcolorbox{explain}[1][Plain-language explanation]{colback=soft,colframe=ink!60,fonttitle=\bfseries,title={#1},boxrule=0.4pt,arc=2pt,left=4pt,right=4pt,top=3pt,bottom=3pt}
+\newtcolorbox{verdict}[1][Verdict]{colback=okgreen!5,colframe=okgreen!70!black,fonttitle=\bfseries,title={#1},boxrule=0.5pt,arc=2pt,left=4pt,right=4pt,top=3pt,bottom=3pt}
+\newtcolorbox{warnbox}[1][Watch out]{colback=badred!4,colframe=badred!80!black,fonttitle=\bfseries,title={#1},boxrule=0.5pt,arc=2pt,left=4pt,right=4pt,top=3pt,bottom=3pt}
+
+\newcommand{\V}{\textsuperscript{\textcolor{okgreen}{[V]}}}
+\newcommand{\I}{\textsuperscript{\textcolor{warnamber}{[I]}}}
+\newcommand{\X}{\textsuperscript{\textcolor{ink}{[ext]}}}
+\newcommand{\code}[1]{\texttt{\detokenize{#1}}}
+
+\begin{document}
+
+%======================================================================== TITLE
+\begin{titlepage}
+\vspace*{1.5cm}
+{\color{aigp}\rule{\linewidth}{2pt}}\\[0.6cm]
+{\Huge\bfseries\color{ink} AI Grand Prix\\[0.25cm] Physical Qualifier}\\[0.4cm]
+{\LARGE Onboarding Crash Course \& Engineering Journal}\\[0.4cm]
+{\color{aigp}\rule{\linewidth}{2pt}}\\[0.8cm]
+{\large Team Electric Fire (Team 10) \quad$\cdot$\quad repo \code{Code-Red-Cables/AI_GP}, branch \code{isaacsim} @ \code{66b61c5}}\\[0.3cm]
+{\large Revision~1: 16 September 2026, the evening before the team arrived at LC3\\
+\textbf{Revision~2: 17 September 2026, written on site with the real drone and the specification in hand}}\\[1.2cm]
+
+\begin{tcolorbox}[colback=soft,colframe=ink!40,boxrule=0.4pt,arc=2pt,title=How to read this document,fonttitle=\bfseries]
+\textbf{Part I (Sections 1--5)} is a crash course: what the competition is, the minimum drone-autonomy vocabulary, how our system is put together, where things live in the repo, and what the physical course looks like.
+\textbf{Part II (Sections 6--12)} is the engineering journal: project history, the Isaac PPO stack in depth, audit findings with evidence, the durability (stress) study run on 16 Sep, Plan B, and next steps.
+
+Evidence tags: \V\ verified by reading code, running it, or checking git on 16 Sep;
+\I\ inference; \X\ from a public source outside our repo (organizer site, the Betaflight source, or the public repository of AI of Sauron, another PQ team).
+The \code{AI_GP} repository was treated as \emph{read-only}; every experiment ran on scratch copies.
+
+\textbf{People and plans named in this document.}
+\begin{itemize}
+\item \textbf{Gene} (Geneustace Wicaksono) is the team's main developer. He built and trained the simulator pilot described here.
+\item \textbf{Plan~A:} fly Gene's trained neural network at racing speed.
+\item \textbf{Plan~B:} fly a slower, hand-written step-by-step controller that stops and lines up in front of each gate (Section~\ref{sec:planbsim}).
+\item \textbf{AI of Sauron:} another physical-qualifier team, from Georgia Tech, whose public repository describes the same drone.
+\item \textbf{Where the files are:} every file this document mentions (the corrections patch, the test tools, the one-hour retrained model, the raw results) is in the \code{AI_GP} repository on the branch \code{pq-analysis-0916}, under \code{analysis/2026-09-16/}. The retrained model is at \code{isaac_drone_racer/models/pq_retrain_1h_corrected.pt}. All experiments ran on bojro's laptop (RTX 4060 laptop GPU, Windows with WSL).
+\end{itemize}
+\end{tcolorbox}
+
+\vspace{0.6cm}
+\begin{takeaway}[Summary]
+\begin{enumerate}[leftmargin=1.2em]
+\item \textbf{The course is fixed and known.} Ten numbered gates (gate~9 is a stacked double gate, gate~6 is a split-S), flown in order, two laps. Only small as-built differences from the published map are expected.
+\item \textbf{What we had for the physical qualifier (PQ):} a neural-network pilot that Gene trained by reinforcement learning (trial and error in a simulator, explained in Section~\ref{sec:rl}). It is saved as the file \code{pq_speed_best.pt} and is called ``Gene's model'' throughout this document. In simulation it lapped in \textbf{7.35--7.47\,s}, averaging \SI{14.4}{m/s} and peaking at \SI{25.4}{m/s} (verified headless on 16 Sep). \textbf{As of 17 September this model is abandoned} --- it does not survive on the corrected simulator. It is kept in this document as evidence of \emph{how} a policy can look excellent and be worthless, which is the most useful thing it now does.
+\item \textbf{Nothing in the repo talks to the real drone yet.} The team's flight program (the Python ``client'' in the repository root) speaks MAVLink, the protocol of the virtual-qualifier simulator; the real drone is Betaflight + MSP over UART to a Jetson. Camera capture, a real-image gate detector and an onboard gate counter are also still to be built.
+\item \textbf{Four corrections for the team:}
+  (a) a bug in the training code stops it from counting gate passes, so any further training fails (proven by a side-by-side test; the fix is one line);
+  (b) the simulated camera is \SI{90}{\degree} wide, the real one is \SI{75}{\degree};
+  (c) Gene's simulated course is about 93\,\% of the true size (it must be scaled up by about 7.5\,\%), and its gates sit \SI{0.65}{m} too high;
+  (d) the real flight controller turns stick commands into rotation speed and thrust along curves, but the simulator assumes straight-line relationships.
+\item \textbf{Durability:} the policy is fast but brittle.
+\begin{itemize}
+\item \textbf{Real camera:} 42 crashes per 100 gates.
+\item \textbf{True course size:} 10 per 100.
+\item \textbf{Both together:} it clears 4 gates and crashes, every time.
+\item \textbf{After a one-hour retrain on the corrected simulator:} 10$\times$ fewer crashes under expected conditions, but still only 6--7\,\% two-lap success. A real retrain takes hours (Sections~\ref{sec:stress}--\ref{sec:retrain}).
+\end{itemize}
+\item \textbf{Strategy:} scoring is most gates first, time second, best run of Mon~21--Tue~22 Sep. Bank a valid run with Plan~B first, then attempt speed.
+\item \textbf{Plan~B tested in simulation} (Section~\ref{sec:planbsim}), using the ``balanced'' setting: gates at \SI{2.5}{m/s}, cruise \SI{4}{m/s}. It finished \textbf{100\,\%} of runs under expected conditions and 88\,\% under rougher ones, in about \textbf{2:05} for two laps.
+\begin{itemize}
+\item ``Safe'' takes 2:21 (93\,\% under rougher conditions); ``fast'' takes 1:52 (79\,\% under rougher conditions).
+\item A barometer is optional.
+\item \textbf{Camera tilt must be measured:} an unknown \SI{5}{\degree} error is its biggest single risk.
+\end{itemize}
+\end{enumerate}
+\end{takeaway}
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+\input{status_17sep}
+\newpage
+
+%======================================================================== PART I
+\part*{Part I --- Crash course}
+\addcontentsline{toc}{part}{Part I --- Crash course}
+
+\section{The competition in two pages}
+
+\subsection{What the AI Grand Prix is}
+An autonomous drone-racing competition run by Anduril with the Drone Champions League (DCL); the drones come from Neros.\X\ More than 3{,}000 teams entered. Human input during a timed run disqualifies it: the drone must fly itself.
+
+\begin{table}[H]\centering\small
+\begin{tabularx}{\linewidth}{@{}lp{3.1cm}X@{}}
+\toprule
+Stage & When & What \\
+\midrule
+VQ1 (virtual qualifier 1) & opened 31 May & DCL ``FlightSim'' simulator on Windows; short course; spec VADR-TS-001. \\
+VQ2 & 29 Jun -- 3 Aug & Harder course, position and attitude data blocked: camera (640$\times$360) + IMU only. Top 10 teams advanced.\X \\
+\textbf{Physical Qualifier (PQ)} & \textbf{15--22 Sep 2026} & Real drones in a hall at Anduril LC3 (OC-23, 3100 W Lake Center Dr, Santa Ana). Spec VADR-TS-005 (issue 00.02). \\
+Finals (``AI Grand Prix Ohio'') & November 2026 & Columbus, Ohio; live head-to-head; \$500K prize pool; top 10 at Ohio get at least \$5K.\X\ How many PQ teams advance is not published. \\
+\bottomrule
+\end{tabularx}
+\caption{Competition stages.}
+\end{table}
+
+\subsection{PQ rules that matter}
+\begin{itemize}
+\item \textbf{Scoring} (spec \S3.3): rank by the \emph{maximum number of successfully passed gates}; tie-break is the \emph{fastest elapsed time to the last validly crossed gate}. Qualification uses the best result from the \textbf{final two days} (Mon~21 and Tue~22 Sep).
+\item \textbf{A run} is two laps. Timing starts at the first timing line or gate trigger. Any pilot intervention makes the run invalid.
+\item \textbf{Practice:} several dedicated slots per team per day (15\,min each in the earlier public spec TS-004\X) plus time in a training cage. Manual piloting is allowed in practice.
+\item \textbf{Fleet:} each team gets 4 drones. Neros repairs them and does all charging; personal chargers are not allowed.
+\item \textbf{Flight controller access:} rates, PIDs, filters and telemetry may be changed through the Betaflight CLI; reflashing is not allowed.
+\item \textbf{Safety:} a pilot's RC transmitter always overrides autonomy. Nobody stands near the flight path. The safety briefing on day~1 is mandatory.
+\item \textbf{Logistics:} 07:00--22:00 on site, out by 23:00, day badges, closed-toe shoes. Team 10 has its own password on the ``AI Grand Prix'' racing Wi-Fi. That password is in the welcome packet and must never go into the public repo.
+\end{itemize}
+
+\subsection{The hardware you will fly}
+\begin{table}[H]\centering\small
+\begin{tabularx}{\linewidth}{@{}lX@{}}
+\toprule
+Airframe & Neros Archer B2, 8-inch propellers (4.1 pitch). \textbf{All-up race weight measured on site, 17 Sep: \SI{1745}{g}.}\V\ Motor and battery specs are given on site. \\
+Flight controller & Betaflight. Another PQ team reads firmware 4.4.3 on an H743 board, MSP API 1.45.\X \\
+FC $\leftrightarrow$ computer & UART using \textbf{MSP} (MultiWii Serial Protocol), not MAVLink. Another team uses \code{/dev/ttyTHS1} at 115200 baud and sees about 100 MSP replies/s in total.\X \\
+Computer & NVIDIA Jetson Orin NX 16\,GB on a Seeed A603 carrier, JetPack 6.2 (Ubuntu 22.04, Python 3.10), 25\,W mode, full root access. The organizers provide demo apps for camera bring-up and FC serial communication. \\
+Camera & Arducam 12.3\,MP HQ (Sony IMX477), rolling shutter, M12 lens, 1920$\times$1080. Spec: 60\,fps and \SI{75}{\degree} horizontal FOV, which is \textbf{fx\,=\,fy\,=\,417.0\,px} at 640$\times$360. Another team calibrated \emph{their} lens at fx\,$\approx$\,1271\,px (\SI{74.1}{\degree}), which is close but is their lens, not ours. Tilt is adjustable \emph{in flight}, exposure and gain are controllable, and \textbf{no calibration matrices are provided} --- so we must calibrate our own. \\
+IMU & From Betaflight, calibrated at power-on. Spec says 50\,Hz; about 92\,Hz is achievable over MSP.\X \\
+Positioning & None: no motion capture, no GPS. \\
+\bottomrule
+\end{tabularx}
+\caption{PQ hardware (spec VADR-TS-005 \S3.6--3.8 and FAQ).}
+\end{table}
+
+\subsection{Is the course the same as in our simulator? (FAQ)}
+\begin{explain}[Short answer: yes, it is a fixed, published course]
+The organizers publish one layout: the plan on page~6 of our spec, plus a gate-coordinate table (``Drone Racing Track --- Gate Layout \& Coordinate Reference for Contestants'').
+The course is built once in the hall and is the same for every team; it is \emph{not} randomized between runs. Our Isaac track is a hand-digitized copy of that plan, slightly mis-scaled (Section~\ref{sec:track}).
+
+What can differ in practice:
+(i) as-built placement a few tens of centimetres or a few degrees off the drawing;
+(ii) gates knocked and re-set during the week;
+(iii) exact heights, which the plan does not give (frames stand on the floor, so the opening centre is about \SI{1.35}{m}; the double gate's upper opening is about \SI{4.05}{m}, confirmed on site on 15 Sep by another team\X);
+(iv) the spec says map-distribution details ``will be announced later'', so ask whether the layout can change before scoring.
+This is why the durability study treats ``gate shifted a little'' as \emph{expected}, while ``a different course'' is only a stress probe.
+\end{explain}
+
+%------------------------------------------------------------------------
+\section{Drone-racing autonomy in ten minutes}
+
+\subsection{The loop}
+Every autonomous racer runs the same loop many times per second:
+\begin{enumerate}
+\item \textbf{Perceive.} Find the gates in the camera image. Our stack describes a gate by its \textbf{8 keypoints}: the 4 corners of the 2.7\,m outer frame and the 4 corners of the 1.5\,m opening.
+\item \textbf{Estimate.} Know your own attitude (roll, pitch), rotation rates (gyro) and, roughly, your velocity. There is no position sensor, so the gate itself is the landmark.
+\item \textbf{Decide.} A controller or learned \textbf{policy} maps what it sees to a command.
+\item \textbf{Actuate.} Send the command to the flight controller (FC), which spins the motors.
+\end{enumerate}
+
+\subsection{Vocabulary}
+\begin{longtable}{@{}p{3.3cm}p{12.3cm}@{}}
+\toprule
+Term & Meaning \\
+\midrule\endhead
+Roll / pitch / yaw & Rotation about the forward / right / down axes. Roll and pitch tilt the thrust to move sideways and forward; yaw turns the nose. \\
+Body rates & How fast the drone rotates (rad/s) about each axis. The gyro measures them. \\
+ACRO mode & Betaflight mode in which the sticks command \emph{body rates}. Fastest and most agile. Our policy is trained for this. \\
+ANGLE mode & Betaflight mode in which the sticks command \emph{tilt angles} and the FC self-levels. Safer and slower. Plan~B uses it. \\
+Throttle / collective & Total thrust. ``Hover stick'' is the throttle value that exactly holds altitude. \\
+MSP & MultiWii Serial Protocol. Betaflight's command/telemetry protocol over a serial link. \\
+MSP override & Betaflight feature: while an AUX switch is on, selected RC channels come from the companion computer over MSP instead of the pilot's radio. \\
+MAVLink & A different drone protocol (PX4/ArduPilot). The VQ simulator used it, which is why our client speaks it. \\
+Jetson & The onboard NVIDIA computer that runs our code. \\
+Keypoints & The 8 gate corners in pixel coordinates. \\
+PnP & Perspective-n-Point: solve the camera's pose relative to an object from its known 3-D corners and their pixel positions. \\
+FOV / fx & Field of view, and focal length in pixels. Narrower FOV means larger fx and larger-looking gates. \\
+Latency & Delay from photon hitting the sensor to motor response. \\
+RL / PPO & Reinforcement learning: the policy learns by trial and error from a reward. PPO (Proximal Policy Optimization) is the algorithm we use. \\
+Policy / checkpoint & The trained neural network, and the file that stores its weights (\code{.pt}). \\
+Observation / action & What the policy sees / what it outputs. \\
+Reward shaping & Extra reward terms that guide learning (e.g.\ ``progress toward the gate''). \\
+Privileged information & Information a simulator has that the real drone does not, e.g.\ exact gate corners. \\
+Sim-to-real gap & Everything that differs between simulation and reality. \\
+Domain randomization & Varying the simulator during training (mass, delays, noise) so the policy tolerates reality. \\
+Isaac Sim / Isaac Lab & NVIDIA's GPU physics simulator, and its robot-learning framework (thousands of drones in parallel). \\
+skrl & The RL library used to run PPO. \\
+Keeper & The team's word for the saved model currently worth keeping; here, Gene's model \code{pq_speed_best.pt}. \\
+Episode / attempt & One simulated flight, from its start until a crash or the time limit. \\
+Plant & The simulator's model of how the drone physically responds to commands. \\
+Headless & Running the simulator without its 3-D window. \\
+Fine-tune / warm start & Continue training from an existing saved model instead of from scratch. \\
+IMU & Inertial measurement unit: the gyroscope (rotation speed) and accelerometer on the flight controller. \\
+Betaflight & The flight-controller firmware on the drone. It stabilizes the drone and turns stick commands into motor speeds. \\
+UART / serial & The cable link between the Jetson computer and the flight controller. \\
+AUX channel & An extra radio channel driven by a switch on the pilot's transmitter (for example ARM on AUX1). \\
+Bitmask & A number whose binary digits switch individual options on or off (the override mask 15 = binary 1111 = roll, pitch, throttle and yaw). \\
+Failsafe & What the flight controller does when it loses its command link; here \code{DROP} cuts the motors. \\
+PID & A standard feedback controller that corrects an error using its size, its accumulated history and its rate of change. \\
+Barometer & An air-pressure sensor that gives altitude. \\
+Dead reckoning & Estimating position by integrating motion estimates, with no external reference; errors grow over time. \\
+Gate normal / axis & The direction a drone must fly through a gate, perpendicular to the gate frame. \\
+p95 & The 95th percentile: 95\,\% of values are at or below it. \\
+Intrinsics / calibration & A camera's focal length, image centre and lens distortion, measured with a printed pattern (for example a ChArUco board). \\
+YOLO / HSV detector & Two ways to find gates in an image: a neural-network detector (YOLO) or a colour threshold (HSV). \\
+TensorRT / GStreamer & NVIDIA's tool for running neural networks fast on the Jetson; a video pipeline library for reading the camera. \\
+\bottomrule
+\end{longtable}
+
+%------------------------------------------------------------------------
+\section{How our system works}\label{sec:system}
+
+\subsection{Big picture}
+\begin{figure}[H]\centering
+\begin{tikzpicture}[
+  node distance=5mm and 7mm,
+  box/.style={draw=ink,rounded corners=2pt,fill=soft,align=center,font=\footnotesize,minimum height=9mm,text width=24mm},
+  sim/.style={box,fill=aigp!10,draw=aigp},
+  todo/.style={box,fill=badred!8,draw=badred,dashed},
+  arr/.style={-{Stealth[length=2mm]},thick,draw=ink!80}]
+% training row
+\node[sim] (isaac) {Isaac Sim\\4096 simulated drones\\PQ track copy};
+\node[sim,right=of isaac] (proj) {Gate corners\\\emph{projected} from\\true gate poses};
+\node[sim,right=of proj] (obs) {Observation\\51 numbers $\times$ 32\\= 1632 inputs};
+\node[sim,right=of obs] (pol) {PPO policy\\MLP 256-256-256};
+\node[sim,right=of pol] (act) {thrust + 3 rates\\$\rightarrow$ PD rate loop\\(simulated FC)};
+\draw[arr] (isaac)--(proj); \draw[arr] (proj)--(obs); \draw[arr] (obs)--(pol); \draw[arr] (pol)--(act);
+\draw[arr] (act.south) -- ++(0,-4mm) -| node[pos=0.25,below,font=\scriptsize]{physics step, reward, PPO update} (isaac.south);
+\node[above=1mm of proj.north west,anchor=south west,font=\small\bfseries,color=aigp] {TRAINING (exists, runs on a laptop GPU)};
+% deployment row
+\node[todo,below=22mm of isaac] (cam) {IMX477 camera\\on Jetson};
+\node[todo,right=of cam] (det) {Gate detector\\(YOLO-pose or HSV)\\8 keypoints};
+\node[box,right=of det] (obs2) {Same 1632-D\\observation\\(\code{race_obs.py})};
+\node[box,right=of obs2] (pol2) {Same policy\\\code{pq_speed_best.pt}};
+\node[todo,right=of pol2] (msp) {MSP bridge\\$\rightarrow$ Betaflight (ACRO)\\$\rightarrow$ motors};
+\draw[arr] (cam)--(det); \draw[arr] (det)--(obs2); \draw[arr] (obs2)--(pol2); \draw[arr] (pol2)--(msp);
+\node[todo,below=5mm of obs2,text width=30mm] (cnt) {Onboard gate/lap counter\\+ IMU/attitude via MSP};
+\draw[arr] (cnt)--(obs2);
+\node[above=1mm of det.north west,anchor=south west,font=\small\bfseries,color=badred] {DEPLOYMENT ON THE REAL DRONE (dashed = not in the repo yet)};
+\end{tikzpicture}
+\caption{Training vs deployment. The policy and observation format are shared; the dashed blocks are the missing deployment layer.}
+\end{figure}
+
+\subsection{Reinforcement learning in plain terms}\label{sec:rl}
+\begin{explain}[How Gene's model was made]
+\begin{itemize}
+\item \textbf{The pilot is a neural network}, called the \emph{policy}. Many times per second it receives a list of numbers describing what the drone currently senses (the \emph{observation}) and outputs four numbers: throttle and three rotation speeds (the \emph{action}).
+\item \textbf{Nobody tells it how to fly.} It starts out flying randomly inside a simulator. After every step the simulator hands out a score, the \emph{reward}: points for moving toward the next gate and for passing through it, and a penalty for crashing.
+\item \textbf{The training algorithm, PPO} (Proximal Policy Optimization), slowly adjusts the network's internal numbers so that actions which earned more reward become more likely.
+\item \textbf{Scale:} Isaac Sim runs thousands of simulated drones in parallel on the graphics card (4096 in Gene's runs).
+\begin{itemize}
+\item A \emph{timestep} is one decision made by all of those drones at once.
+\item \emph{Samples} are timesteps multiplied by the number of drones.
+\item One of Gene's typical training runs is 50{,}000 timesteps, about 205 million samples, about 1.4 hours.
+\end{itemize}
+\item \textbf{Checkpoints:} the saved network is a \emph{checkpoint} file (\code{.pt}). Training runs can start from an earlier checkpoint instead of from scratch (a \emph{warm start} or \emph{fine-tune}).
+\item \textbf{The key limitation:} the network only learns to handle what the simulator showed it. If the simulator's course, camera, delays or thrust differ from reality and were never varied during training, the network has no reason to cope with the difference. Section~\ref{sec:stress} measures exactly this.
+\end{itemize}
+\end{explain}
+
+\subsection{What the policy sees and does}\label{sec:obs}
+\begin{table}[H]\centering\small
+\begin{tabularx}{\linewidth}{@{}lXX@{}}
+\toprule
+Slots & Content & Notes \\
+\midrule
+0--15 & where the 8 gate corners appear in the camera image (horizontal and vertical pixel position, divided by the image size 640$\times$360) & $-1$ if a corner is not visible; order: outer frame top-left, top-right, bottom-right, bottom-left, then the same for the inner opening \\
+16--23 & visibility flags & corner in front of camera and within frame $\pm$15\,\% \\
+24--25 & roll, pitch (rad) & gravity-referenced \\
+26--28 & rotation speeds from the gyroscope, limited to $\pm$8 rad/s & \\
+29--31 & ``commanded'' body velocity & integrated from thrust, attitude and a drag model; never from the accelerometer \\
+32--49 & which gate is next: 18 numbers, all 0 except a single 1 at that gate's position (11 of the 18 slots are used on this course) & the policy always knows which gate it is flying to \\
+50 & progress through the course: gate number divided by 17 (the list has 18 slots, numbered 0--17) & \\
+\bottomrule
+\end{tabularx}
+\caption{One observation frame (51 numbers). The policy receives the last 32 frames (0.53\,s at 60\,Hz): 1632 inputs. Keypoints refresh at 30\,Hz; everything else at 60\,Hz.}
+\end{table}
+
+\begin{explain}[How the model is structured]
+\begin{itemize}
+\item \textbf{Network:} a plain feed-forward net, $1632 \rightarrow 256 \rightarrow 256 \rightarrow 256$ (ELU), with a 4-number action head and a 1-number value head (551k parameters). Inputs are normalised by stored running means and variances.
+\item \textbf{Output:} $[-1,1]^4$, decoded to
+  \begin{itemize}
+  \item a throttle stick: hover at 0.255, range 0.05--0.90, mapped linearly to newtons with a \SI{0.6076}{kg} mass (maximum thrust-to-weight $\approx3.5$);
+  \item three body rates of up to $\pm$\SI{3.2}{rad/s}.
+  \end{itemize}
+\item \textbf{No map input,} but the ``which gate is next'' numbers tell it \emph{where on the course} it is. That is how it learns this specific course's turns. It also means a different course, or a wrong gate count on the real drone, will confuse it.
+\end{itemize}
+\end{explain}
+
+\subsection{How it was trained}
+\begin{itemize}
+\item \textbf{Timing:} 120\,Hz physics, 60\,Hz policy, 40\,s episodes, a random start gate each episode, tiny random pushes ($\pm$0.1\,N).
+\item \textbf{Plant:} rigid body with collective thrust plus a PD body-rate loop ($k_p{=}0.08$, $k_d{=}0.003$, moment limits 0.30/0.30/0.20\,N$\cdot$m). No motor model, no drag, no latency, no sensor noise.
+\item \textbf{Episode ends on:} collision (including the ground), crossing a gate plane outside the $\pm$0.75\,m opening, more than 20\,m from the target gate, or the 40\,s time-out.
+\item \textbf{PPO settings (technical; safe to skip):} 4096 envs, 24-step rollouts, learning rate $10^{-4}$ (KL-adaptive), $\gamma{=}0.99$, $\lambda{=}0.95$, 50k timesteps per run ($\approx$1.4\,h on Gene's RTX 4070 laptop with 4096 drones).
+\end{itemize}
+
+\begin{table}[H]\centering\small
+\begin{tabularx}{\linewidth}{@{}XrX@{}}
+\toprule
+Reward term & Weight & Idea \\
+\midrule
+gate passed & +600 & the real objective \\
+progress toward the next gate / toward a point 3\,m straight in front of it & +20 / +25 & continuous guidance toward the gate \\
+speed along the gate normal at the crossing & +3.4 & go fast through gates \\
+camera aligned / centred at crossing & +4 / +4 & pass cleanly \\
+low-gate dive, proximity, heading, look-at, visible & small & shaping \\
+time penalty, angular-rate penalty & $-0.01$, $-10^{-4}$ & \\
+termination (crash, miss, flyaway) & $-100$ & \\
+\bottomrule
+\end{tabularx}
+\caption{Reward terms: the points the simulator awards during training (current code, identical to the settings Gene's model was trained with).}
+\end{table}
+
+%------------------------------------------------------------------------
+\section{Repo tour}\label{sec:repo}
+\begin{table}[H]\centering\footnotesize
+\begin{tabularx}{\linewidth}{@{}p{6.6cm}X@{}}
+\toprule
+Path (branch \code{isaacsim}) & What it is \\
+\midrule
+\code{ISAACSIM.md} & Start here for the PQ stack: Windows GUI play, WSL headless training, installs \\
+\code{isaac_drone_racer/} & The Isaac Lab project (fork of kousheekc/isaac\_drone\_racer, copied in without its git history) \\
+\quad \code{tasks/drone_racer/drone_racer_env_cfg.py} & Scene, \textbf{track}, observation, rewards, terminations, task settings \\
+\quad \code{tasks/drone_racer/mdp/} & Actions (plant), commands (gate targeting, pass detection), observations, rewards, events \\
+\quad \code{utils/aigp_obs.py} & Observation contract: \textbf{camera model} (FX=320, 20\,\si{\degree} tilt), keypoint projection, velocity integrator \\
+\quad \code{dynamics/rate_control.py} & Action decode, stick$\rightarrow$newtons, PD rate moments \\
+\quad \code{scripts/rl/train.py}, \code{play.py} & Training and GUI playback \\
+\quad \code{models/pq_speed_best.pt} & \textbf{Gene's best model} (plus earlier saved models) \\
+\quad \code{logs/skrl/drone_racer/} & All 32 training runs, 30 Aug -- 6 Sep (TensorBoard + checkpoints, 1.5\,GB) \\
+\quad \code{PHYSICAL_TUNING.md} & On-site procedure to measure the real drone and copy constants into Isaac \\
+\code{race_obs.py}, \code{isaac_planner.py} & The same observation on the flight-client side; runs an Isaac policy inside the client \\
+\code{main.py}, \code{setup.py}, \code{controller.py}, \code{mavlink_rx.py}, \code{vision_rx.py} & Flight client written for the VQ simulator (MAVLink/UDP) \\
+\code{tools/pad_constants.py}, \code{tools/run_isaac.py} & On-site measurement tool, Isaac-policy runner (both MAVLink) \\
+\code{vision/} & Gate detectors: YOLO-pose, deterministic HSV orange-opening detector, PnP \\
+\code{reference/} & VQ and PQ specs, papers \\
+\bottomrule
+\end{tabularx}
+\caption{Where things live. Behaviour-cloning / HG-DAgger code and the VQ-simulator models are retired and not covered.}
+\end{table}
+
+\subsection{Running things on the team laptop (WSL)}
+\begin{lstlisting}
+# Isaac environment (Isaac Sim 4.5, Isaac Lab 2.1, skrl 1.4.2, Python 3.10)
+source ~/aigp/isaac_env.sh
+# train or evaluate from a scratch copy, never from the repo (training writes logs/ into cwd)
+cd ~/aigp/idr_exp            # copy with the gate-counting fix applied
+python -u scripts/rl/train.py --task Isaac-Drone-Racer-v0 --headless --num_envs 2048 --max_iterations 30
+# headless evaluation / stress tests (scratch tools, outside the repo)
+PYTHONPATH=$PWD:$PYTHONPATH python ~/aigp/tools/eval_policy.py --headless \
+    --task Isaac-Drone-Racer-Play-v0 --num_envs 1 --steps 4800 \
+    --checkpoint models/pq_speed_best.pt --out ~/aigp/eval/play.json
+PYTHONPATH=$PWD:$PYTHONPATH python ~/aigp/tools/stress_eval.py --headless --num_envs 512 \
+    --checkpoint models/pq_speed_best.pt --scenario '{"track":"official","cam_fx":423.6}' --out out.json
+\end{lstlisting}
+Isaac Sim often hangs on exit after writing results; kill it by PID. The 3-D viewer does not render under WSL (no Vulkan device); watching needs the Windows install described in \code{ISAACSIM.md}.
+
+%------------------------------------------------------------------------
+\section{The physical course}\label{sec:course}
+\begin{figure}[H]\centering
+\includegraphics[height=0.62\textheight]{figs/course_overlay.pdf}
+\caption{Official gate coordinates (orange, true size) against the team's Isaac track (blue). The Isaac copy is a roughly \SI{93}{\percent}-scale version of the official layout (Section~\ref{sec:track}).}
+\end{figure}
+\begin{table}[H]\centering\footnotesize
+\begin{tabularx}{\linewidth}{@{}p{3.0cm}rrrX@{}}
+\toprule
+Leg & Distance & \makecell{Arrival angle\\off gate axis} & \makecell{Gate number in\\Gene's simulator} & Note \\
+\midrule
+start box $\rightarrow$ G1 & \SI{7.4}{m} & \SI{7}{\degree} & 6 & takeoff from the floor (never trained) \\
+G1 $\rightarrow$ G2 & \SI{8.3}{m} & \SI{8}{\degree} & 7 & \\
+G2 $\rightarrow$ G3 & \SI{9.0}{m} & \SI{35}{\degree} & 8 & \\
+G3 $\rightarrow$ G4 & \SI{10.8}{m} & \SI{50}{\degree} & 9 & \\
+G4 $\rightarrow$ G5 & \SI{7.9}{m} & \SI{22}{\degree} & 10 & G5 faces \SI{215}{\degree} \\
+G5 $\rightarrow$ G6 & \SI{7.7}{m} & \textbf{\SI{152}{\degree}} & 0 & split-S (the drone passes beside G6, turns around, and comes back through it): pass north of G6, turn back east \\
+G6 $\rightarrow$ G7 & \SI{9.8}{m} & \SI{50}{\degree} & 1 & \\
+G7 $\rightarrow$ G8 & \SI{6.2}{m} & \SI{4}{\degree} & 2 & G8 faces \SI{215}{\degree} \\
+G8 $\rightarrow$ G9 top & \SI{7.0}{m} & \SI{50}{\degree} & 3 & climb to \SI{4.05}{m}, fly south \\
+G9 top $\rightarrow$ G9 bottom & turnaround & \SI{180}{\degree} & 4 & descend to \SI{1.35}{m}, fly north \\
+G9 bottom $\rightarrow$ G10 & \SI{13.6}{m} & \SI{32}{\degree} & 5 & longest leg \\
+G10 $\rightarrow$ G1 & \SI{10.4}{m} & \SI{2}{\degree} & 6 & lap 2 \\
+\bottomrule
+\end{tabularx}
+\caption{Leg geometry from the official table (straight-line, plan view). Headings: the official table gives compass bearings (clockwise from north, so 215\textdegree\ points south-west); elsewhere this document uses the mathematical convention (counter-clockwise from east, so the same heading is $-$125\textdegree). A complete run is two laps; one lap is 11 crossings. Another team counts 23 crossings, finishing on gate~1.\X}
+\end{table}
+
+%======================================================================== PART II
+\newpage
+\part*{Part II --- Engineering journal}
+\addcontentsline{toc}{part}{Part II --- Engineering journal}
+
+\section{Project history}
+\begin{table}[H]\centering\footnotesize
+\begin{tabularx}{\linewidth}{@{}p{2.0cm}p{3.3cm}Xp{3.3cm}@{}}
+\toprule
+Dates & Branch & Approach & Outcome \\
+\midrule
+3 Jun & \code{main}, \code{modified-starter} & Organizer example client; HSV colour gate detection; attitude + thrust commands & controller working, untuned \\
+6--16 Jun & \code{preplanning} & reactive gate chasing, then fixed waypoints & gate 1 passed \\
+17--20 Jun & \code{manual-control}, \code{spline-path} & fly by keyboard to record the course, replay as a spline (VQ1 gave position data) & ``sub 14 seconds'' (commit message only) \\
+28 Jun--18 Jul & \code{Qualifier2*} & VQ2 blocked state data: IMU + vision rebuild & gap analysis: ``vision not connected to flight''; abandoned \\
+23--25 Jul & \code{Q2_new} & DreamerV3 (model-based RL) against the real-time simulator & 168k steps, 0 gates; deleted \\
+26--27 Jul & \code{Q2_new}, \code{Q2_CV}, \code{Q2_pnp} & OpenCV and YOLO corners, PnP + IMU & passed gates 1--2 \\
+28 Jul--1 Aug & \code{Q2_kalman} & dual-gate Kalman filter, tuning harness & human best 35.96\,s \\
+10--30 Aug & \code{classical-vision-}\allowbreak\code{racing} & classical Li \& de Croon stack; behaviour cloning / HG-DAgger (retired as weak) & human best 14.04\,s; no autonomous lap recorded \\
+\textbf{30 Aug--16 Sep} & \textbf{\code{isaacsim}} & \textbf{Isaac Lab PPO on the PQ course} & \textbf{best model \code{pq_speed_best} (5 Sep); copied into the AI\_GP repo on 16 Sep} \\
+\bottomrule
+\end{tabularx}
+\caption{Eras of the project. The \code{isaacsim} branch contains every useful earlier branch.\V}
+\end{table}
+
+\paragraph{Where the Isaac work was done.} All 32 runs record their directory as \nolinkurl{/mnt/d/Code/Competitions/isaac_drone_racer/...}\V, a separate folder on Gene's machine. It was copied into AI\_GP on 16 Sep without its own git history. Gene reports everything relevant is pushed. Trained models for the retired VQ path are excluded from git on purpose and are not needed.
+
+\section{Isaac training history and Gene's best model}
+\begin{table}[H]\centering\small
+\begin{tabularx}{\linewidth}{@{}p{2.2cm}Xp{2.2cm}p{3.6cm}@{}}
+\toprule
+Run & Change & Start from & Best (gates/ep, reward) \\
+\midrule
+30 Aug -- 2 Sep & 7- and 17-gate VQ-style tracks, observation and action redesigns, several NaN/abort runs & scratch & 1.5--4.5 gates \\
+2--3 Sep & look/visibility reward experiments (policy learned to hover and stare) & scratch & $\approx$0 gates \\
+3--4 Sep & zig-zag and ``passage'' shaping (\code{pass_main}, \code{vel_align}, \code{passage_shape}) & chain & 1.8--5.9 \\
+4 Sep 14:49 & first PQ track (different gate order) & passage\_shape & 0.5 (transfer failed) \\
+4 Sep 17:03 & PQ track, current order, gate-passed 600 & \textbf{scratch} & 25.3, 356 (\code{pq_scratch}) \\
+4 Sep 20:38 & + run-in progress, velocity alignment & pq\_scratch & 30.8, 427 (\code{pq_vel}) \\
+4 Sep 23:48 & run-in progress 25 & pq\_vel & 28.9, 400 (\code{pq_hook}) \\
+\textbf{5 Sep 01:08} & \textbf{speed-through-gate 3.4} & pq\_hook & \textbf{33.2, 463 (\code{pq_speed_best})} \\
+6 Sep 01:35 & identical settings, continued & pq\_speed\_best & \textbf{0.0 --- collapsed} (\code{pq_hook2}) \\
+\bottomrule
+\end{tabularx}
+\caption{Training lineage (from checkpoint hashes, run configs and TensorBoard).\V\ ``Gates/ep'' is per 40\,s training episode with exploration noise.}
+\end{table}
+
+\begin{figure}[H]\centering
+\includegraphics[width=\linewidth]{figs/keeper_play.pdf}
+\caption{Gene's model flown on 16 Sep without a display, in Isaac's playback mode (fixed start position, no disturbances, and the network's single best action at every step rather than random exploration).\V\ 59 gates in 40\,s, laps 7.35--7.47\,s, mean \SI{14.4}{m/s}, peak \SI{25.4}{m/s}, altitude 1.5--4.9\,m. This reproduces the 7--8\,s lap time Gene reported from his own runs. The red dashed line marks Plan~B's gate speed for comparison.}
+\end{figure}
+
+\section{Audit findings}\label{sec:findings}
+
+\begin{table}[H]\centering\footnotesize
+\begin{tabularx}{\linewidth}{@{}p{3.3cm}XXp{2.6cm}@{}}
+\toprule
+Item & Gene's simulator (what the model was trained on) & Real physical qualifier & Fixed by the corrections patch? \\
+\midrule
+Camera view width & \SI{90}{\degree} (focal length 320\,px) & \SI{74}{\degree}--\SI{75}{\degree} (about 424\,px) & yes \\
+Camera tilt & exactly \SI{20}{\degree} up & adjustable; unknown until measured & no; measure on site \\
+Course size & about 93\,\% of true size & official coordinates & yes \\
+Gate heights & opening centres at 2.0\,m (double gate 4.7\,m) & about 1.35\,m (double gate about 4.05\,m) & yes \\
+Start & in the air, in front of gate 6 & on the floor, 7.4\,m before gate 1 & playback start only; takeoff never trained \\
+Delay from camera to motors & none & roughly 50--130\,ms & no; needs training with delay \\
+Stick response & straight-line mapping & Betaflight curves (nonlinear) & no; change FC settings or convert in code \\
+Drag, sensor noise, bumps & none (tiny random pushes only) & present & no; needs training with them \\
+Gate corners & computed exactly from the true gate position & must be found by a camera detector (none exists yet for real gates) & no \\
+Which gate is next & provided by the simulator & must be counted onboard (code does not exist yet) & no \\
+Communication & MAVLink over UDP & MSP over a serial cable to Betaflight & no; new code needed \\
+Counting gate passes during training & broken on any reset (bug) & n/a & yes \\
+\bottomrule
+\end{tabularx}
+\caption{Where Gene's simulator differs from the real event. The durability tests in Section~\ref{sec:stress} measure how much each difference matters.}
+\end{table}
+
+
+\subsection{Gate-counting bug in the current Isaac code}\label{sec:bug}
+\code{tasks/drone_racer/mdp/commands.py:234}: whenever \emph{any} environment resets, \code{prev_robot_pos_w} is overwritten for \emph{all} environments. Isaac Lab~2.1 then runs the gate-crossing check in the same step (reset first, then \code{command_manager.compute}), so previous equals current and no crossing is registered anywhere.\V\ With thousands of parallel drones, resets happen almost every step. That explains why the 6 Sep continuation of Gene's model, with byte-identical settings, logged zero passes \emph{and} exactly zero misses.
+
+\begin{minipage}{0.52\linewidth}
+\begin{lstlisting}[language=Python]
+# candidate fix (applied only to scratch copies)
+prev = self.prev_robot_pos_w.clone()
+prev[env_ids] = self.robot.data.root_pos_w[env_ids]
+self.prev_robot_pos_w = prev
+\end{lstlisting}
+\end{minipage}\hfill
+\begin{minipage}{0.45\linewidth}
+\includegraphics[width=\linewidth]{figs/bug_ab.pdf}
+{\footnotesize Left: points earned for passing gates; right: total points; both averaged per training log window, before and after the fix.}
+\end{minipage}
+
+\begin{verdict}
+\textbf{Confirmed by A/B test.}\V\ Starting from Gene's model with identical random seeds, the current code logs 0.014 mean gate reward and 0 misses; with the fix it logs 1.11 and 0.16. Total reward is $-1.6$ vs $+66.7$.
+Any on-site retraining (which \code{PHYSICAL_TUNING.md} plans) collapses until the fix is in. Playback with one drone is mostly unaffected.
+Clone before writing, because line 327 stores Isaac's buffer without copying it.
+\end{verdict}
+
+\subsection{Camera field of view: who is right?}
+\begin{itemize}
+\item \textbf{Code:} \code{utils/aigp_obs.py} and \code{camera_model.py} use a 640$\times$360 image with a focal length of 320 pixels (written fx\,=\,fy\,=\,320; the focal length in pixels sets how wide the view is) and a \SI{20}{\degree} upward camera tilt. That is a \SI{90.0}{\degree} horizontal FOV, taken from the \emph{VQ} simulator spec.\V
+\item \textbf{PQ spec} (VADR-TS-005 \S3.8): \SI{75}{\degree} horizontal FOV at 1920$\times$1080.
+\item \textbf{Measurement}\X: AI of Sauron calibrated the same camera model with a ChArUco board, on their own lens: fx\,=\,1270.7\,px, fy\,=\,1267\,px, principal point (976, 497), five distortion coefficients, and 0.28\,px reprojection error. That is \SI{74.1}{\degree}$\times$\SI{46.2}{\degree}.
+\end{itemize}
+\begin{figure}[H]\centering
+\includegraphics[width=\linewidth]{figs/camera_fov.pdf}
+\caption{The same gate rendered with the code's camera and with the PQ camera. Gates appear about 32\,\% larger and farther off-centre on the real camera, which is exactly the input the policy normalises.}
+\end{figure}
+\begin{verdict}
+\textbf{Our code is wrong for the PQ; the spec and the measurement agree.}
+The specification is the authority and it says \SI{75}{\degree} horizontal, which at 640\,px width is a focal length of \textbf{417.0\,px}, not 320. (The corrections patch of 16 Sep used 423.6\,px, i.e.\ \SI{74.1}{\degree}, taken from another team's calibration of their own lens; \textbf{use 417.0} until we calibrate ours.) The real principal point also sits about 14\,px above centre, and the lens distortion is significant.
+A \SI{74}{\degree} image cannot be remapped to \SI{90}{\degree}, so the policy must either be retrained with the real intrinsics or shown to tolerate the change (Section~\ref{sec:stress}).
+Camera tilt on our drones is still unmeasured. Calibrate on day~1; it takes about 15 minutes.
+\end{verdict}
+
+\subsection{Track size and gate heights: who is right?}\label{sec:track}
+The Isaac track comment says it was digitized by assuming the pylons are \SI{15}{m} apart. We fitted the 11 Isaac gate centres to the organizer's numeric gate table with a similarity transform (scale, rotation, translation):
+\begin{itemize}
+\item best fit: \textbf{scale 0.9348}, rotation \SI{0.03}{\degree}, all gates within \SI{0.42}{m};
+\item forcing scale $=1$ leaves errors up to \SI{1.47}{m}.\V
+\end{itemize}
+Headings agree except gate~5 (Isaac \SI{-90}{\degree} vs official \SI{-125}{\degree}, off by \SI{35}{\degree}) and gate~8 (off by \SI{13}{\degree}).
+The official boundary, $85\times165$\,ft $=25.9\times50.3$\,m, also matches the ``$25.9\times50.3$\,m'' label on the spec plan.
+\begin{verdict}
+\textbf{The Isaac track is \SI{6.5}{\percent} too small, and two gate headings are off.} The organizer table is numeric; the Isaac copy was measured off a picture with an assumed ruler.
+\textbf{Heights:} Isaac places opening centres at \SI{2.0}{m} (double gate \SI{4.7}{m}). Floor-standing 2.7\,m frames put them at \SI{1.35}{m} (double gate \SI{4.05}{m}), as confirmed on site by another team.\X
+\textbf{Start:} Gene's simulator numbers the gates starting from the centre gate (official gate~6 is its gate~0), and its playback mode starts in the air in front of that gate. The real race starts on the floor, 7.4\,m before official gate~1, which is gate~6 in Gene's numbering.
+Confirm with a tape measure on day~1: one gate-to-gate distance settles the scale.
+\end{verdict}
+\begin{warnbox}[Unresolved as of 17 September: the hall footprint]
+The specification (\S3.4) states the track footprint is \textbf{\SI{60}{m}\,$\times$\,\SI{21}{m}}. The plan drawing, measured with its own printed ruler, gives \textbf{\SI{25.9}{m}\,$\times$\,\SI{50.25}{m}}. Those do not reconcile by any single scale factor --- the spec's track is \emph{longer} and \emph{narrower}. Most likely the spec quotes the usable hall volume and the drawing quotes the gate envelope, but that is a guess. \textbf{The on-site survey settles it, and until it does, no document should be trusted for absolute course size.}
+\end{warnbox}
+
+Clarification on drone mass: the \emph{simulated} drone's mass does not differ from the mass its own thrust model assumes --- both are \SI{0.6076}{kg}.\V\ There is no internal mismatch. The real drone weighs \SI{1745}{g}, which is a different problem entirely and is explained in the status section at the front of this document.
+
+\subsection{Flight-controller configuration}
+From another team's full \code{dump all} of the same drone model\X:
+\begin{itemize}
+\item \textbf{Firmware and modes:} Betaflight 4.4.3 (H743). ARM is on AUX1 (pilot's CRSF radio) and \textbf{MSP OVERRIDE} is on AUX5. No ANGLE/HORIZON mode is assigned, so it flies ACRO.
+\item \textbf{Override mask:} \code{msp_override_channels_mask = 11}, i.e.\ roll, pitch and yaw only. \textbf{Throttle is not overridden}; autonomy needs 15.
+\item \textbf{Rates:} Betaflight rates with rc\_rate 0.55 and super\_rate 0.75, about \SI{440}{\degree\per\second} at full stick and \textbf{nonlinear}. The policy assumes linear $\pm$\SI{183}{\degree\per\second}.
+\item \textbf{Throttle curve:} \code{thr_mid 54}, \code{thr_expo 68}, \textbf{nonlinear}. The plant assumes linear.
+\item \textbf{Failsafe:} \code{failsafe_procedure = DROP}.
+\item \textbf{Units:} MSP raw gyro is in counts (16.4 per \si{\degree\per\second}), not \si{\degree\per\second}.
+\end{itemize}
+\begin{warnbox}[Safety fact from the Betaflight 4.4.3 source]
+In \code{src/main/rx/msp_override.c}, while the override switch is on, the FC uses the \textbf{last} \code{MSP_SET_RAW_RC} values it received, \textbf{with no timeout}.\X\ If the Jetson process hangs mid-flight, the drone keeps flying its last command until the pilot flips the switch off or disarms.
+Stream a safe neutral frame before enabling override, run a separate stall watchdog, and brief the pilot.
+\end{warnbox}
+
+\subsection{The missing deployment layer}\label{sec:missing}
+\begin{warnbox}[This is the critical path, confirmed 17 September]
+A repo-wide search finds no occurrence of MSP anywhere in the flight client.\V\ \code{controller.py} sends MAVLink \code{SET_ATTITUDE_TARGET} to a \code{sim_conn} --- the virtual qualifier's simulator interface. Betaflight does not accept MAVLink attitude setpoints, and the PQ specification confirms the real interface is \textbf{MSP over UART}. \textbf{Nothing we have can currently send a single command to the real drone.} Every other activity that involves flying is downstream of fixing this.
+\end{warnbox}
+A repo-wide search also finds no occurrence of serial, Betaflight, Jetson, TensorRT, GStreamer/Argus or CLOCK\_MONOTONIC in the client.\V\ To fly anything on the real drone we need:
+\begin{enumerate}
+\item an MSP bridge (commands out; attitude, raw IMU, status and battery in);
+\item Jetson camera capture with capture timestamps;
+\item a gate detector that works on \emph{real} gate images (the existing detectors were tuned on simulator images);
+\item an onboard gate/lap counter, because the policy's ``next gate number'' input came from the simulator and both learned planners raise an error without it;\V
+\item real-drone safety: crash detection, arming, finish and landing. The existing logic is simulator-based and auto re-arms after a crash.\V
+\end{enumerate}
+Both Plan~A and Plan~B need items 1, 2, 3 and 5.
+
+\subsection{Smaller items}
+\begin{itemize}
+\item \textbf{Parity tests:} the two AI\_GP$\leftrightarrow$Isaac observation parity tests silently skip after vendoring (path moved). With the path fixed, all 29 pass.\V
+\item \textbf{Bridge defaults:} the bridge's default weights path points to a VQ-era file; use \code{pq_speed_best.pt} explicitly. It also enables a ``visual snap'' history rewrite that training never used.\V
+\item \textbf{Stale scripts:} \code{scripts/rl/probe_race.py} references a removed reward term and will crash.\I
+\end{itemize}
+
+%------------------------------------------------------------------------
+\section{Durability study (16 Sep)}\label{sec:stress}
+\subsection{Method}
+\begin{itemize}
+\item \textbf{Setup:} each test (``scenario'') runs Gene's model, always taking its single best action, on 512 simulated drones at once for 40\,s (2400 control steps); tests run later in the day used 20\,s.
+\begin{itemize}
+\item Each simulated drone flies until it crashes, is immediately reset, and tries again. One start-to-crash flight is an \emph{attempt}.
+\item Unless a row says ``race start'', each attempt begins just past a randomly chosen gate, as in training. ``Race start'' means every attempt begins in front of official gate~1, like the real race.
+\item Every test uses a copy of Gene's code with the gate-counting bug fixed. The changes being tested are applied at runtime; none of the team's files were modified.
+\end{itemize}
+\end{itemize}
+
+\begin{explain}[How to read the numbers in the tables below]
+\begin{itemize}
+\item \textbf{Gates per attempt:} how many gates a drone gets through, on average, before it crashes. Higher is better. In the 20--40\,s tests a good model is capped by the test length (about 20--28).
+\item \textbf{Crashes per 100 gates:} total crashes divided by total gates passed, times 100. A crash is hitting anything (including the floor), crossing a gate's plane outside its opening, or flying more than 20\,m away from the next gate. Crashes in the first 1.5\,s after a random start are ignored. Lower is better.
+\begin{itemize}
+\item This is \emph{not} a percentage, so it can exceed 100. A value of 110 means the drone usually crashes before it passes even one gate.
+\end{itemize}
+\item \textbf{Chance of two clean laps} (written $P$(2 laps)): the probability of passing the 22 gate crossings of two laps (11 per lap, the double gate counting twice) without a single crash, estimated as $\max(0,\,1-\text{crashes per gate})^{22}$. It is 0\,\% whenever crashes outnumber gates.
+\item \textbf{Test length:} 40\,s for the first tests, 20\,s for tests run later in the day, 25\,s for the retraining comparison. Crashes per 100 gates can be compared across lengths; gates per attempt only within the same length.
+\item \textbf{Test labels:} codes such as ``A6'' or ``S1'' are just short names for individual tests. Their meaning is written out in each row.
+\item \textbf{Realism levels} (the ``Band'' column):
+\begin{itemize}
+\item \textbf{Reference:} Gene's own simulated course, as trained.
+\item \textbf{Expected:} things that will almost certainly be true at the real event:
+\begin{itemize}
+\item the true course size and gate heights;
+\item the real camera;
+\item gates placed a little off the map;
+\item imperfect gate detection;
+\item about 50\,ms of delay between seeing and acting;
+\item a hover thrust that is slightly wrong;
+\item a heavier, slower-responding 8-inch drone;
+\item air drag.
+\end{itemize}
+There is no wind, because the event is indoors.
+\item \textbf{Rougher:} plausible but pessimistic versions of the same things, plus small bumps (propeller wash, a light touch).
+\item \textbf{Stress only:} things not expected at the event: wind, hard bumps, 200\,ms delay, resized gates, and completely different courses. The last group tests whether the model memorized the course rather than learning to fly.
+\item \textbf{Combined:} rows marked ``combined'' apply all the disturbances of their level at once.
+\end{itemize}
+\end{itemize}
+\end{explain}
+
+\subsection{Results}
+\IfFileExists{stress_table.tex}{\input{stress_table.tex}}{\textit{(results pending)}}
+\IfFileExists{figs/stress_results.pdf}{\begin{figure}[H]\centering\includegraphics[width=\linewidth]{figs/stress_results.pdf}\caption{Crash rate per 100 gates (log scale) and the implied chance of finishing two laps, by scenario and realism band.}\end{figure}}{}
+\IfFileExists{stress_discussion.tex}{\input{stress_discussion.tex}}{}
+
+\subsection{Retraining on the corrected simulator (16 Sep)}\label{sec:retrain}
+\textbf{Setup.} As a feasibility test, Gene's model was trained further (fine-tuned) for one hour on bojro's laptop in a corrected copy of the simulator (the \code{pq_corrections.patch} changes):
+\begin{itemize}
+\item \textbf{Corrections:} official track and heights, the \SI{74}{\degree} camera, and the gate-counting fix.
+\item \textbf{Randomized ``expected'' disturbances}, so the model sees them during training:
+\begin{itemize}
+\item 33\,ms vision and 17\,ms command latency;
+\item 2\,px keypoint noise with 5\,\% missed frames;
+\item attitude and gyro noise;
+\item a 30\,ms rate lag and drag;
+\item a per-drone thrust scale of $\pm$10\,\%;
+\item per-drone gate shifts of $\pm$0.25\,m and $\pm$\SI{5}{\degree}.
+\end{itemize}
+\item \textbf{Size:} 2048 drones, 32.4k PPO timesteps (about 66M samples), roughly $\frac{1}{3}$ of one of Gene's standard 50k-step, 4096-drone fine-tunes.
+\end{itemize}
+\IfFileExists{figs/retrain_curves.pdf}{\begin{figure}[H]\centering\includegraphics[width=\linewidth]{figs/retrain_curves.pdf}\caption{Training curves of the one-hour fine-tune.}\end{figure}}{}
+\IfFileExists{retrain_table.tex}{\input{retrain_table.tex}}{\textit{(evaluation pending)}}
+\IfFileExists{retrain_discussion.tex}{\input{retrain_discussion.tex}}{}
+
+\subsection{How long proper retraining takes on bojro's laptop}
+\begin{table}[H]\centering\small
+\begin{tabular}{@{}lr@{}}
+\toprule
+Job (RTX 4060 Laptop, WSL, 2048 drones, measured $\approx$9.3--10 timesteps/s $\approx$ 20k samples/s) & Time \\
+\midrule
+One-hour feasibility fine-tune above (32.4k timesteps) & 55--60\,min \\
+Standard 50k-timestep fine-tune (2048 drones) & $\approx$1\,h\,25\,min \\
+Same samples as Gene's 50k-timestep, 4096-drone runs (205M samples) & $\approx$2\,h\,50\,min \\
+Gene's model's entire training history, from scratch (634M samples) & $\approx$8\,h\,45\,min \\
+\bottomrule
+\end{tabular}
+\caption{Projected training times.}
+\end{table}
+\textbf{Constraints and caveats:}
+\begin{itemize}
+\item \textbf{GPU memory:} 8\,GB fits one Isaac job at a time (training uses 5.5\,GB).
+\item \textbf{RAM:} WSL is capped at 7.5\,GB and training uses 4.7\,GB. 4096 drones would need a bigger WSL memory cap (a WSL restart) and might not fit in GPU memory.
+\item \textbf{CPU:} throughput is limited by the CPU/Python loop (the GPU sits near 52\,\%), so other CPU jobs slow training noticeably.
+\item \textbf{Power:} keep the laptop on AC and awake.
+\end{itemize}
+Gene's RTX 4070 Laptop is of the same order per step.
+
+
+%------------------------------------------------------------------------
+\section{Plan A and Plan B}
+\begin{table}[H]\centering\small
+\begin{tabularx}{\linewidth}{@{}lXX@{}}
+\toprule
+& Plan A (existing policy) & Plan B (moderate, deterministic) \\
+\midrule
+Brain & \code{pq_speed_best} PPO & state machine: fly to an approach point, face, align on the gate, creep, punch through \\
+FC mode & ACRO (Jetson sends body rates) & ANGLE (FC self-levels; Jetson sends angles + throttle) \\
+Speed & $\approx$\SI{14}{m/s} mean, \SI{25}{m/s} peaks; 7.4\,s laps in Gene's simulator & through gates at \SI{2.5}{m/s}, up to \SI{4}{m/s} between gates; $\approx$2:05 for two laps in simulation (``balanced'' setting) \\
+Needs & MSP bridge, real-image keypoints matching training, linear rate/throttle curves, gate counter; probably a retrain with real intrinsics and track & MSP bridge, gate detector tuned on real frames, hover throttle, pitch$\rightarrow$speed calibration, FC mode change (ask first) \\
+Risk & high (sim-to-real gap at speed) & low \\
+\bottomrule
+\end{tabularx}
+\caption{The two plans share the same foundation: MSP link, camera capture, logging, bench checks.}
+\end{table}
+
+\subsection{Plan B speed budget}
+\begin{itemize}
+\item \textbf{Why not crawl:} too slow risks an unknown run-time limit (VQ capped runs at 8\,min), eats 15-minute slots, drains the battery while hovering, and accumulates drift between gate sightings.
+\item \textbf{Why not faster:} above about \SI{4}{m/s}, a look-and-servo controller runs out of turning radius and latency margin.
+\end{itemize}
+\begin{table}[H]\centering\small
+\begin{tabular}{@{}lrrrrrl@{}}
+\toprule
+Tier & Cruise & Tightest turn (\SI{20}{\degree} bank) & Stop distance & Latency travel (100\,ms) & Lap & 2-lap run \\
+\midrule
+slow & \SI{1.5}{m/s} & \SI{0.6}{m} & \SI{0.4}{m} & \SI{15}{cm} & $\approx$120\,s & $\approx$4.3\,min \\
+\textbf{medium} & \textbf{\SI{2.5}{m/s}} & \SI{1.8}{m} & \SI{1.2}{m} & \SI{25}{cm} & $\approx$75\,s & $\approx$\textbf{2.9\,min} \\
+quick & \SI{3.5}{m/s} & \SI{3.4}{m} & \SI{2.3}{m} & \SI{35}{cm} & $\approx$57\,s & $\approx$2.2\,min \\
+(too fast) & \SI{5.0}{m/s} & \SI{7.0}{m} & \SI{4.8}{m} & \SI{50}{cm} & & \\
+\bottomrule
+\end{tabular}
+\caption{Plan B speed limits: back-of-envelope physics for flying \emph{through a gate} at each speed. Between gates the drone may go faster, because it slows down before each gate. In the simulation these became the settings ``safe'', ``balanced'' and ``fast'' (Table~\ref{tab:planb}; the simulation in Section~\ref{sec:planbsim} supersedes the lap estimates). Clearance inside the 1.5\,m opening is about $\pm$\SI{0.45}{m} for a roughly \SI{0.6}{m} airframe (measure ours).}
+\end{table}
+\begin{itemize}
+\item \textbf{Speed control without a velocity sensor:} in ANGLE mode, speed settles where $v \approx g\tan(\text{pitch})/k$. Calibrate pitch$\rightarrow$speed from one logged straight flight, close the loop on the gate's apparent growth (range rate), and cap pitch at \SI{12}{\degree}.
+\item \textbf{Anti-stall rules:} alignment is time-boxed to 1.5\,s; a lost gate gets one search sweep, after which the drone slows down rather than aborting; each leg has a time budget of $2\times$ its expected duration.
+\end{itemize}
+
+\begin{figure}[H]\centering
+\begin{tikzpicture}[node distance=4mm and 6mm,
+  st/.style={draw=ink,rounded corners=2pt,fill=soft,font=\scriptsize,align=center,minimum height=8mm,text width=17mm},
+  bad/.style={st,fill=badred!8,draw=badred},
+  arr/.style={-{Stealth[length=1.6mm]},draw=ink!80}]
+\node[st] (pre) {PREFLIGHT\\checks};
+\node[st,right=of pre] (arm) {pilot ARM +\\override on};
+\node[st,right=of arm] (to) {TAKEOFF\\hover $\approx$1.35\,m};
+\node[st,right=of to] (goto) {GOTO\\approach point\\(dead-reckon)};
+\node[st,right=of goto] (face) {FACE gate\\axis, search};
+\node[st,below=9mm of face] (align) {ALIGN\\yaw, roll, height\\($\le$1.5\,s)};
+\node[st,left=of align] (creep) {CREEP\\\SI{2.5}{m/s}, servo\\on the gate};
+\node[st,left=of creep] (punch) {PUNCH\\hold heading\\through};
+\node[st,left=of punch] (brake) {BRAKE /\\re-anchor on gate};
+\node[st,left=of brake] (land) {after last gate:\\LAND, pilot disarms};
+\node[bad,below=6mm of creep,text width=50mm] (hold) {any watchdog $\rightarrow$ HOLD (level, hover) $\rightarrow$ LAND};
+\draw[arr] (pre)--(arm); \draw[arr] (arm)--(to); \draw[arr] (to)--(goto); \draw[arr] (goto)--(face);
+\draw[arr] (face)--(align); \draw[arr] (align)--(creep); \draw[arr] (creep)--(punch); \draw[arr] (punch)--(brake);
+\draw[arr] (brake.north) to[bend left=18] node[above,font=\scriptsize]{next gate} (goto.south west);
+\draw[arr] (brake)--(land);
+\end{tikzpicture}
+\caption{Plan B state machine. Special moves: at the G6 split-S, pass north of the gate and turn back east; at G9, top opening southbound, descend, then bottom opening northbound.}
+\end{figure}
+\IfFileExists{planb_section.tex}{\input{planb_section.tex}}{}
+
+
+\input{localization}
+
+%------------------------------------------------------------------------
+\input{plan_17sep}
+
+%------------------------------------------------------------------------
+\appendix
+\section{Laptop environment (installed 16 Sep)}
+\begin{itemize}
+\item \textbf{Hardware:} RTX 4060 Laptop (8\,GB), 15\,GB RAM (WSL sees 7.6\,GB), 16 cores, WSL Ubuntu 26.04, no passwordless sudo.
+\item \textbf{Missing:} no compiler at all --- \code{gcc}, \code{g++}, \code{make}, \code{cmake} and \code{ffmpeg} are absent, which blocks building the Betaflight software-in-the-loop simulator. \code{venv-client} has no \code{pip}. One command fixes both: \code{sudo apt install -y build-essential cmake ffmpeg poppler-utils}, then \code{python -m ensurepip}.
+\item \textbf{Repo:} \code{~/Downloads/ai-grand-prix/AI_GP}, branch \code{isaacsim}, read-only for us.
+\item \textbf{Flight client:} \code{~/aigp/venv-client} (Python 3.12, CUDA torch, ultralytics, OpenCV, pymavlink, pytest, tensorboard). The client test suite: 441 pass, 79 fail, 1 skip; the failures are in retired VQ code or are minor drift.
+\item \textbf{Isaac:} \code{source ~/aigp/isaac_env.sh}. Isaac Sim 4.5, Isaac Lab 2.1 (\code{~/aigp/IsaacLab}), skrl 1.4.2, torch 2.5.1+cu121.
+\begin{itemize}
+\item Pins: numpy$<$2, transformers$<$4.50, warp-lang$<$1.8, gymnasium$<$1.2.
+\item System libraries were unpacked from \code{.deb} files into \code{~/aigp/syslibs}.
+\end{itemize}
+\item \textbf{Scratch copies:}
+\begin{itemize}
+\item \code{~/aigp/idr_smoke}: original code.
+\item \code{~/aigp/idr_A}, \code{idr_B}: bug A/B test.
+\item \code{~/aigp/idr_exp}: bug fix, used for all experiments.
+\end{itemize}
+\item \textbf{Tools and results:} \code{~/aigp/tools/eval_policy.py}, \code{stress_eval.py}, \code{make_figs.py}; results in \code{~/aigp/eval/}.
+\end{itemize}
+
+\section{Sources}
+\begin{itemize}
+\item VADR-TS-005 PQ Technical Specification, issue 00.02 (2026-09-03); AI Grand Prix welcome packet.
+\item theaigrandprix.com (home/FAQ, previous updates, official rules); public PQ spec TS-004; VQ2 spec TS-003.
+\item Organizer gate-coordinate table ``Drone\_Race\_Track\_Gate\_Coordinates\_with\_doublegate\_5800.pdf'', as published in another team's repository.
+\item \code{github.com/JCorbin406/AIGP-Physical-Qualifier} (``AI of Sauron''): FC dump, MSP notes, camera calibration, on-site confirmations. No license, so facts are used and no code.
+\item Betaflight 4.4.3 source, \code{src/main/rx/msp_override.c}, \code{src/main/rx/msp.c}.
+\item kousheekc/isaac\_drone\_racer (BSD-3); Isaac Lab 2.1; skrl 1.4.2.
+\item Kaufmann et al., ``Champion-level drone racing using deep reinforcement learning'', \emph{Nature} 2023; Xing et al., CoRL 2024 (imitation plus RL for vision-based racing).
+\end{itemize}
+
+\end{document}

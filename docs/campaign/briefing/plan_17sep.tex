@@ -1,0 +1,377 @@
+%========================================================== TECHNICAL GAPS
+\section{Technical gap register}\label{sec:gaps}
+
+\subsection{First, what Betaflight actually is}
+
+Several gaps below are ``Betaflight things'', so here is the minimum needed to read them.
+
+\begin{explain}[The flight controller, in plain terms]
+The \textbf{flight controller} is a small circuit board on the drone with a gyroscope on it, running
+firmware called \textbf{Betaflight}. Its job is narrow and fast: take four numbers --- throttle,
+roll, pitch, yaw --- several thousand times a second, and spin the four motors so the drone does what
+those numbers ask. It handles the violent, millisecond-scale balancing that keeps a quadcopter in
+the air. We do not have to write that, and we could not do it better.
+
+Normally those four numbers come from a \textbf{radio receiver} wired to the flight controller,
+listening to a human pilot's remote control.
+
+\textbf{MSP} (MultiWii Serial Protocol) is simply a message format for talking to the flight
+controller down a serial wire. Betaflight speaks it. The feature we need is called \textbf{MSP
+override}: while a switch on the pilot's remote is flipped on, Betaflight takes its four stick
+numbers from MSP messages --- from our Jetson --- instead of from the radio. Flip the switch off and
+the pilot has the drone back, immediately, in firmware. That is our kill path.
+
+Two more terms that appear below:
+\begin{itemize}
+\item \textbf{ACRO and ANGLE} are flight modes. In \textbf{ACRO}, stick position means \emph{rate of
+rotation}: hold the stick over and the drone keeps rolling; centre it and it stops rolling but stays
+tilted wherever it ended up. In \textbf{ANGLE}, stick position means \emph{lean angle}: centre the
+stick and it returns to level by itself. Our trained policy outputs rotation rates, so it needs
+ACRO. Plan~B wants ANGLE, because ``hold still and hover'' is then almost free.
+\item \textbf{Blackbox} is Betaflight's built-in flight recorder. It logs throttle, gyro, motor
+outputs and battery voltage during a flight, and you download it over USB afterwards. Almost every
+measurement we need about the drone comes out of it.
+\end{itemize}
+\end{explain}
+
+\subsection{Gap register}
+
+Effort is one person's working time. ``Blocks'' names what cannot start until this is done.
+
+{\setlength{\tabcolsep}{3pt}\begin{longtable}{@{}p{0.85cm} p{3.9cm} p{6.5cm} p{1.45cm} p{1.95cm}@{}}
+\toprule
+ID & Gap & What it means, and why it matters & Effort & Blocks \\
+\midrule\endhead
+\multicolumn{5}{@{}l}{\textbf{A --- Flight controller and the link to it} \emph{(much reduced: the organizers ship the protocol layer)}}\\
+\midrule
+A0 & Copy \code{~/target/} off a board & \code{scp -r dcl@192.168.55.1:~/target ./}. Until somebody does this, nobody else can develop against the fake flight controller. & 10 min & All adapter work \\
+A1 & Adapter, not protocol & MSP framing is provided. We write the layer that turns policy output into \code{RCTransmitter.set\_control()} calls. & 4\,h & Everything autonomous \\
+A2 & Free the serial port & \code{sudo setup\_jetson\_uart.sh -{}-apply}, once per board. Linux runs a login console on that port by default. \textbf{Skipping this looks exactly like a dead flight controller.} & 5 min & Any link at all \\
+A3 & Rate curve inversion & \textbf{Still ours.} Betaflight maps stick to rotation rate along a curve (\code{rc\_rate}, \code{super\_rate}, \code{expo}), gentle in the middle and aggressive at the ends. Our policy speaks radians per second. A linear approximation is wrong by tens of percent mid-range. & 4\,h & Accurate control \\
+A4 & Throttle curve inversion & \textbf{Still ours.} Same for throttle (\code{thr\_mid}, \code{thr\_expo}). & 1\,h & Height control \\
+A5 & Sign and axis mapping & \textbf{Still ours, and the most dangerous item here.} Isaac is forward-left-up, Betaflight is forward-right-down, plus channel order. A reversed sign flips the drone on takeoff. Verify one axis at a time, props off. & 2\,h & Any flight \\
+A6 & Watchdog: configure and verify & \code{RCTransmitter} already has one, in its own thread. Set the timeout, then prove it against \code{fake\_fc.py}'s frozen mode. & 1\,h & Safety sign-off \\
+A7 & \textbf{Loop rate mismatch} & Organizers: attitude at 30--50\,Hz is realistic, a hard real-time loop is not. Our policy runs at 60\,Hz and eats gyro as input. Measure, then match the simulator to it. & 2\,h & \textbf{Training validity} \\
+A8 & Gyro units unverified & Sources conflict: raw counts at 16.4 per \si{\degree\per\second} versus already in \si{\degree\per\second}. \textbf{Verify empirically} --- the wrong choice is a silent 16$\times$ error. & 30 min & Sensor fusion \\
+A9 & Arming flow & \code{msp\_bench.py demo} clears an MSP arming lock, arms, then re-asserts it; Betaflight also blocks arming while an MSP client is connected. Read their code and copy the sequence. & 2\,h & Any real run \\
+A10 & Override mask: verify, do not assume & The mask\,=\,11 finding (throttle not overridden) came from \emph{another team's} dump. Since \code{demo} drives throttle successfully, ours may already be right. Check \code{diff all} on our drone. & 10 min & Autonomous hover \\
+A11 & ANGLE mode not assigned & Flies ACRO; Plan~B needs ANGLE. CLI-assignable --- confirm it is permitted. & 15 min & Plan~B \\
+A12 & Blackbox not configured & Must be on and recording gyro debug data, or the measurement flight yields nothing. & 15 min & All diagnostics \\
+A13 & Camera/IMU time sync & \textbf{No hardware sync line exists on this carrier.} Must be solved in software, and the exposure must be pinned first or auto-exposure moves the capture instant every frame. & 4\,h & Latency measurement \\
+\midrule
+\multicolumn{5}{@{}l}{\textbf{B --- Onboard software}}\\
+\midrule
+B1 & Capture with \emph{real} timestamps & Viewers exist. But \code{cv2.VideoCapture} discards the hardware capture timestamp and gives arrival time with tens of ms of jitter. Use the GStreamer path where timing matters. & 4\,h & Perception \\
+B1b & \textbf{Image processor needs a display} & Colour, auto-exposure and white balance run in NVIDIA's ISP, which needs a graphics context a plain SSH session lacks. Headless gives flat, un-exposed frames \emph{by design}. Arrange a display context, or design for minimally-processed frames. & 4\,h & Usable images \\
+B2 & \textbf{No framework on the board} & Confirmed: OpenCV, NumPy, pyserial, python3-gi --- no PyTorch. The NumPy policy runtime is now \emph{mandatory}. The detector must go to ONNX via OpenCV's DNN module or TensorRT. Never \code{pip install opencv-python}: it silently breaks the camera pipeline. & 3\,h & Plan~A \\
+B3 & No gate counter & The ``which gate is next'' input has no source on the real drone. & 1 day & Plan~A \\
+B4 & No takeoff routine & The policy was trained starting \emph{in the air} near a gate. The real race starts on the floor. Something must take off, stabilise, and hand over. & 4\,h & Any real run \\
+B5 & Crash and abort logic is simulator-era & The existing logic auto-re-arms after a crash, which is a simulator behaviour and dangerous on a real drone. & 3\,h & Safety sign-off \\
+B6 & No onboard logging standard & Every flight needs a synchronised record of inputs, outputs and detections, or we cannot diagnose anything. & 2\,h & All learning \\
+B7 & Compute budget unverified & Detector plus policy plus capture, at 25\,W, at the target frame rate. Unknown until measured. & 2\,h & Loop rate \\
+\midrule
+\multicolumn{5}{@{}l}{\textbf{C --- Perception}}\\
+\midrule
+C1 & Detector has never seen a real gate & Existing detectors were tuned on simulator images. See Section~\ref{sec:detect}. & 2 days & Any autonomy \\
+C2 & Camera not calibrated & The spec states no calibration will be provided, and it is a screw-mount lens. & 1\,h & Perception accuracy \\
+C3 & Camera tilt unknown & It is adjustable, even in flight, so it is a choice we must make and then measure. A \SI{5}{\degree} error took crashes to 32 per 100 gates. & 30 min & Perception accuracy \\
+C4 & \textbf{Sensor mode may not exist} & The carrier wires only \textbf{two of the camera's four data lanes}, capping resolution $\times$ framerate. \code{v4l2-ctl -{}-list-formats-ext} is the truth, not the datasheet. The \SI{75}{\degree} figure is quoted for 1920$\times$1080 at 60\,fps --- if that mode is missing, our field of view is wrong before we start. & 10 min & Everything perception \\
+\midrule
+\multicolumn{5}{@{}l}{\textbf{D --- Simulator fidelity}}\\
+\midrule
+D1 & Thrust-to-weight is a guess & Hover throttle assumed 25.5\,\%. Worth 58 crashes per 100 gates if wrong by 10\,\%. & 5 min & Training validity \\
+D2 & Inertia and rate response wrong & 5-inch airframe values on an 8-inch drone; see the warning in the status section. & 4\,h & Training validity \\
+D3 & Zero latency modelled & The most damaging single factor found: \SI{50}{ms} alone took crashes from 2 to 55 per 100 gates. & 3\,h & Training validity \\
+D4 & No drag model & Significant above \SI{10}{m/s}. & 3\,h & Training validity \\
+D5 & Perfect vision assumed & The simulator hands the policy exact gate corners with no noise, no dropouts and never the wrong gate. This is the largest single difference between simulation and reality. & 1 day & Transfer \\
+D6 & Course map: official table in hand & The official coordinates confirm $85\times165$\,ft and our corrected track matches exactly. \textbf{Still survey the as-built placement} --- a 7.5\,\% scale error alone took crashes from 2 to 15.5 per 100 gates. & 2\,h & Training validity \\
+D7 & \textbf{Policy rate may be too fast} & Simulator runs a 60\,Hz policy; real gyro feedback may be 30--50\,Hz. Set decimation to the measured rate \emph{before} the long training run. & 1\,h & Training validity \\
+\midrule
+\multicolumn{5}{@{}l}{\textbf{E --- Operations}}\\
+\midrule
+E1 & No compiler on the laptop & \textbf{Downgraded.} The Betaflight software-in-the-loop build is no longer needed --- the organizers' \code{fake\_fc.py} is pure Python and does the job better. & 10 min & nothing now \\
+E2 & Practice slots unknown & Flight time is rationed and scheduled. Everything must be planned around the slot list. & --- & All planning \\
+E3 & Battery and propeller count unknown & The real limit on how many attempts we get. & --- & Risk budget \\
+\bottomrule
+\caption{Technical gap register as of 17 September, after reading the organizers' Orin NX guides. Nothing here is a criticism of the existing code --- almost all of it was written for the virtual qualifier, which was a different race with a different interface. The A-series shrank considerably once it became clear the organizers ship the protocol layer themselves.}\label{tab:gaps}
+\end{longtable}}
+
+%========================================================== WORKSTREAMS
+\section{The plan, organised as parallel workstreams}\label{sec:ws}
+
+The mistake to avoid is queueing everything behind the flight-controller link. Only one workstream
+actually depends on it. Three others need no software at all and should start the same hour.
+
+\begin{table}[H]\centering\footnotesize
+\begin{tabularx}{\linewidth}{@{}p{1.1cm} p{3.0cm} X p{2.4cm}@{}}
+\toprule
+Stream & Name & Content & Waits for \\
+\midrule
+\textbf{WS-1} & Link and control & MSP implementation, curve inversion, watchdog, bench validation (gaps A1--A12) & \textbf{Nothing.} This is the critical path \\
+\textbf{WS-2} & Vehicle characterisation & Weigh, balance, measure; the piloted measurement flight; hover thrust, rate response, drag, battery sag (D1--D4) & \textbf{Nothing} --- a human pilot and a blackbox log need no code \\
+\textbf{WS-3} & Perception & Camera bring-up, calibration, data capture, labelling, detector, gate counter (B1, B3, C1--C4, D5) & Camera only \\
+\textbf{WS-4} & Course survey & Tape-measure every gate from a fixed datum; reconcile with both documents; build the map (D6) & \textbf{Nothing} --- hall access and a tape measure \\
+\textbf{WS-5} & Simulator and training & Fold measurements in; cloud training with randomised unknowns; evaluate with the stress harness & \textbf{Nothing} --- starts with wide randomisation \\
+\textbf{WS-6} & Integration and flight test & The bring-up ladder, in practice slots & WS-1, plus WS-3 and WS-4 for gate work \\
+\textbf{WS-7} & Plan~B & The slow stop-and-line-up controller & WS-1, WS-3 \\
+\textbf{WS-0} & Operations & Slots, batteries, organizer questions, installs, logistics & \textbf{Nothing} \\
+\bottomrule
+\end{tabularx}
+\caption{Eight workstreams. Five of the eight can start immediately and in parallel.}
+\end{table}
+
+\begin{takeaway}[How to staff this]
+Put your strongest systems person on \textbf{WS-1} alone, with a second person reviewing the sign
+and axis conventions --- a reversed sign there flips the drone on takeoff, and it is the single most
+common first-flight failure in this whole field.
+
+\textbf{WS-2} needs the pilot plus one engineer, and it is the cheapest high-value work available:
+one battery, one log, and the simulator stops guessing.
+
+\textbf{WS-4} is two people and ninety minutes, and it retires a risk worth 15 crashes per 100
+gates. Do it on day one and do it again before the scored days.
+
+\textbf{WS-3} is the longest pole after WS-1 and it is mostly patient work --- capture, label, train,
+measure. Start the capture the hour the camera produces a frame.
+\end{takeaway}
+
+%========================================================== PROCEDURES
+\section{Field procedures}\label{sec:proc}
+
+\subsection{P1 --- Camera calibration}
+\begin{enumerate}
+\item Confirm the sensor mode first (gap C4). The \SI{75}{\degree} figure applies to 1920$\times$1080
+at 60\,fps. If our pipeline captures another mode, the field of view is different before we start.
+\item Print a checkerboard or ChArUco target and \textbf{glue it to something rigid and flat}. A
+curled printout produces a confident, wrong calibration.
+\item Capture 30--50 views at the race exposure and gain settings: target near and far, tilted in
+both axes, in all four corners of the frame.
+\item Solve for focal length, principal point and distortion (OpenCV). Expect a reprojection error
+below about half a pixel; if it is worse, the target moved or the board is not flat.
+\item \textbf{Sanity check independently:} tape measure flat against a wall, camera exactly
+\SI{2.00}{m} away, and confirm the width spanned matches the focal length you solved for.
+\item Record the result with the date and the specific drone. The four airframes may not match.
+\end{enumerate}
+
+\subsection{P2 --- Camera tilt}
+\begin{enumerate}
+\item Set the drone on a surface you have confirmed is level with a spirit level.
+\item Measure the camera mount angle with a phone inclinometer held against the lens face or the
+bracket. Repeat three times and take the median; this is easy to get wrong by a couple of degrees.
+\item Cross-check optically: place a target at a known height at a known distance and confirm it
+lands where the calibrated model predicts.
+\item Tilt is adjustable, so \textbf{decide} it: a lower tilt (around \SI{10}{\degree}) suits Plan~B's
+slow, near-level flight; a higher tilt (around \SI{20}{\degree}) suits fast forward-leaning flight.
+Choose, set, measure, and write it down. Then use that number in the simulator.
+\end{enumerate}
+
+\subsection{P3 --- Vehicle diagnostics: one battery, one log}\label{sec:diag}
+
+This is the highest-value thirty minutes of the week. Fly it with a human pilot, with blackbox
+logging switched on, in this order. It needs no autonomy software at all.
+
+\begin{table}[H]\centering\footnotesize
+\begin{tabularx}{\linewidth}{@{}p{0.6cm} p{4.4cm} X@{}}
+\toprule
+\# & Manoeuvre & What it yields \\
+\midrule
+1 & Armed on the ground, 10\,s idle & Gyro noise floor; vibration spectrum; motor idle value \\
+2 & Stable hover at \SI{1.5}{m} for 20\,s & \textbf{Hover throttle} --- gap D1, the most valuable number available. Also a ground-effect reference \\
+3 & Three sharp rolls, three pitches, three yaws, settling between each & \textbf{Rate response}: rise time, overshoot, peak angular acceleration, per axis --- gap D2. This is what replaces guessing the inertia \\
+4 & Full-throttle vertical climb, 1.5\,s, then recover & \textbf{Maximum thrust} and true thrust-to-weight \\
+5 & Hold about \SI{20}{\degree} of pitch down a straight until the speed stops rising & \textbf{Drag} --- gap D4. Drag coefficient $\approx m g \tan\theta / v^2$ \\
+6 & Hover again for 20\,s near the end of the pack & \textbf{Battery sag}: how much hover throttle rises as the pack empties \\
+7 & Land, disarm, download the log, and save a \code{diff all} from the CLI & The settings dump. Do not skip this; it is the thing that will be missing at 2\,a.m.\ \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Repeat manoeuvre~2 on every airframe you might fly. Hover throttle is the number the whole simulator
+hangs from, and four supposedly identical drones are rarely identical.
+
+\subsection{P4 --- Latency}
+Latency is the most damaging single factor in the durability study, and it is also the one people
+estimate instead of measuring. Measure it.
+\begin{enumerate}
+\item Synchronise the clocks first (gap A12), or the answer is meaningless.
+\item Put a bright LED in the camera's view, wired so the Jetson can switch it.
+\item Flash it, and record: the time the Jetson commanded the flash; the timestamp of the first frame
+showing it lit; the time the detector produced an output; the time the command went out over MSP; and
+the time the gyro first responded.
+\item That chain gives you each stage separately, which matters --- knowing the total is \SI{90}{ms}
+is useful, knowing that \SI{60}{ms} of it is the detector tells you what to fix.
+\item Feed the measured total, and its variation, into the simulator as a randomised band.
+\end{enumerate}
+
+\subsection{P5 --- Course survey}
+\begin{enumerate}
+\item Choose a datum: a permanent corner as the origin, plus a second fixed feature to define the
+direction of the $x$ axis. Mark both with tape and photograph them.
+\item For each gate, measure the \textbf{base of both uprights} from the datum. Two points give you
+the centre \emph{and} the heading in one operation, which is far more reliable than measuring an
+angle directly.
+\item Record the bottom-bar height for one gate of each type, and confirm the double gate's upper
+opening centre.
+\item Note what the drawing does not show: pylons, netting, lighting rigs, anything above \SI{4}{m}.
+\item Convert to the simulator's frame and difference against \emph{both} the organizer table and the
+drawing. Reconcile every gate that differs by more than \SI{0.25}{m} before training on it.
+\item Re-measure every morning and before every scored run. Ask what tolerance gates are re-placed
+to; that number becomes the gate-jitter range in training.
+\end{enumerate}
+
+\subsection{P6 --- Gate detection and data labelling}\label{sec:detect}
+
+This deserves its own treatment, because it is the largest difference between our simulator and
+reality, and it is the workstream most likely to be underestimated.
+
+\begin{explain}[Why this is hard, when the simulator makes it look easy]
+In the simulator, the policy is handed the eight corners of the gate as exact pixel coordinates,
+computed by projecting the gate's known geometry through a perfect pinhole camera. There is no noise.
+Corners are never missed. It is never the wrong gate. Visibility is known exactly.
+
+On the real drone, every one of those is false. You have a compressed image of an orange-and-white
+frame against a cluttered hall, with motion blur, a rolling shutter that skews fast-moving objects,
+changing light, other gates in frame, orange pylons that look like gate material, and a detector that
+will sometimes return nothing and occasionally return something confidently wrong.
+
+\textbf{Closing this gap has two halves, and the second is the one teams skip:} make the detector as
+good as is reasonable, \emph{and} make the policy tolerant of a realistic detector by reproducing the
+detector's \emph{measured} error statistics inside the simulator. Perfect detection is not
+achievable; a policy that degrades gracefully when detection is imperfect is.
+\end{explain}
+
+\paragraph{Stage 0 --- classical detector, first hour.}
+Tune the existing colour-and-geometry detector on real frames --- it lives in \code{vision/} as
+\code{snake\_gate\_detector}, and \code{tools/hsv\_tuner} adjusts its colour thresholds. No data, no
+training, no installation. It will be noisier
+and shorter-ranged than a learned detector, but it is available immediately and it is the fallback
+that cannot fail to be ready. Plan~B tolerates a noisy detector far better than Plan~A does.
+
+\paragraph{Stage 1 --- capture, starting the hour the camera works.}
+Data capture is the bottleneck, so begin it before you need it. Capture must cover:
+\begin{itemize}
+\item distances from about \SI{1}{m} to \SI{15}{m}, and all approach angles including oblique;
+\item \emph{every} gate on the course --- the backgrounds differ, and that is what a detector learns;
+\item gates partially cut off by the frame edge, and two gates overlapping;
+\item the double gate, from below and from the upper approach;
+\item backlit and shadowed conditions, and whatever the lighting does across a day;
+\item \textbf{negatives}: frames with no gate, and frames containing confusers --- orange pylons, red
+signage, other drones, people;
+\item \textbf{motion blur}, which means recording every manual pilot flight. Hand-carried footage is
+easy to collect but is missing exactly the degradation that matters in flight.
+\end{itemize}
+
+\paragraph{Stage 2 --- labelling, done cheaply.}
+Labelling is where teams lose a day. Three techniques cut the work by roughly five to ten times:
+\begin{enumerate}
+\item \textbf{Auto-label, then correct.} Run the classical detector over all footage and keep its
+output as draft labels. Correcting a drawn box is far faster than drawing one.
+\item \textbf{Geometric auto-labelling --- the big win.} We know the gate's exact geometry
+(\SI{2700}{mm} outer, \SI{1500}{mm} inner) and, after the survey, exactly where each gate is. If the
+camera pose for a frame is known, the eight corners project into the image exactly --- the label is
+free and pixel-perfect. Bootstrap it: hand-label around 40 frames, solve the camera pose from those
+by PnP, then track along the video and re-project labels for every frame in between. This is how an
+afternoon produces thousands of labelled frames instead of a few hundred.
+\item \textbf{Label what the policy actually needs.} The observation wants eight keypoints plus
+visibility flags --- not bounding boxes. Keypoint labelling is slow. A hybrid is cheaper: let a
+learned model find the gate as a box, then fit the quadrilateral inside it with classical line
+fitting. Much less labelling, and \code{vision/yolo\_hybrid\_gate\_detector.py} is already shaped
+this way.
+\end{enumerate}
+For a single, visually distinctive object class, fine-tuning a pretrained detector typically needs
+\textbf{300--800 well-chosen labelled frames}, not tens of thousands. Spend the effort on coverage
+and on the hard cases, not on volume.
+
+\paragraph{Stage 3 --- train and deploy.}
+Fine-tune on the laptop GPU; it is a small model and takes minutes. Then build the accelerated engine
+\textbf{on the Jetson itself} --- these are specific to the device and software version and cannot be
+prepared in advance. Budget real time for this at the venue.
+
+\paragraph{Stage 4 --- measure the detector, because this is what feeds the simulator.}
+The useful metrics are not the ones detector papers report. Measure:
+\begin{itemize}
+\item detection rate against distance --- what \emph{is} our reliable range?
+\item corner pixel error against distance and viewing angle, as a median and a 95th percentile;
+\item false positives per frame, and specifically what triggers them;
+\item how often the identity is wrong;
+\item throughput and latency at \SI{25}{W}.
+\end{itemize}
+Get ground truth by placing the drone at tape-measured positions relative to a gate: those frames have
+exactly known corner positions, so the error can be measured rather than estimated.
+\code{tools/eval\_detectors.py}, \code{tools/eval\_gate\_pose.py} and \code{tools/vision\_rate.py}
+exist for this.
+
+\paragraph{Stage 5 --- close the loop.}
+Feed those measurements back as the simulator's vision model: pixel noise as a function of distance,
+dropout rate, maximum range, frame rate, latency. Then retrain. This is the step that converts a
+detector measurement into a policy that survives a real detector, and it is the reason Stage~4 is not
+optional.
+
+\paragraph{The gate counter.}
+Separately from detection: maintain the expected gate number, predict where that gate should appear
+using the surveyed map, and accept a detection only if it lands near the prediction. Advance the
+count on a confirmed pass, with a short lockout so one crossing cannot count twice. \textbf{Encode
+explicitly that the double gate counts twice per lap} --- one physical gate carrying two different
+numbers is where a counter desynchronises. If the expected gate is not seen for a while, widen the
+search, then fall back to a hold; never silently re-label, and log every re-association. Test all of
+this offline by replaying a hand-carried lap before it ever flies.
+
+%========================================================== SCHEDULE
+\section{Schedule and decision gates}\label{sec:schedule}
+
+\begin{table}[H]\centering\footnotesize
+\begin{tabularx}{\linewidth}{@{}p{1.5cm} p{3.2cm} X@{}}
+\toprule
+Day & Goal & Exit criterion \\
+\midrule
+Thu 17 & We can command the drone, and we know the course & Bench test with propellers off passes on all four axes; piloted measurement flight logged; hover throttle known; course surveyed; overnight training launched \\
+Fri 18 & We can see and count gates & Detector working on real gates; gate counter verified offline against recorded footage; autonomous hover; station-keeping in front of one gate \\
+Sat 19 & \textbf{A complete lap, by any means} & One clean Plan~B lap. This puts a floor under the score. Plan~A begins with the speed limiter at minimum \\
+Sun 20 & Rehearsal and freeze & Both plans rehearsed under run conditions; gates re-measured; configuration frozen; \textbf{Plan~A go/no-go} \\
+Mon 21 & \textbf{Scored} & First slot: most reliable configuration, flown slowly, to bank gates. Then step up \\
+Tue 22 & \textbf{Scored} & Improve on the banked score. Never risk the drone before a valid run exists \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\textbf{Plan~A go/no-go, Sunday.} All three must hold:
+\begin{enumerate}
+\item it has flown at least three gates autonomously on the real drone, more than once;
+\item its observations have been checked against the real camera and the real flight-controller
+curves;
+\item its failure mode is a safe hold, not a flyaway.
+\end{enumerate}
+
+\begin{warnbox}[The scoring rule that should drive every decision]
+Ranking is by \textbf{maximum number of gates passed}; time is only the tie-break; and it is the best
+run across the final two days. A slow run that completes therefore beats a fast run that ends at gate
+four. Bank a score first. Push afterwards. Do not let the last day be the first time we have completed
+a run.
+\end{warnbox}
+
+%========================================================== QUESTIONS
+\section{Questions still open for the organizers}
+
+The specification answered several questions that Revision~1 listed. Answered: the interface is MSP
+over UART, with demo software provided; Betaflight CLI access covers rates, PIDs and filters but not
+reflashing; camera tilt is adjustable in flight; exposure and gain are controllable; no calibration
+matrices are provided; a valid run is two laps with no human pilot intervention; manual override
+always supersedes autonomy; practice is in scheduled slots.
+
+Still open:
+\begin{enumerate}
+\item May we assign an ANGLE mode switch, and change \code{msp\_override\_channels\_mask}, the rate
+curve and the throttle curve?
+\item May we place tape or markers on the gates to identify them? \textbf{A yes largely removes the
+gate-counting problem}, so ask early.
+\item Who arms the drone for a scored run? Does arming and enabling override before the start line
+count as intervention?
+\item Is there a maximum run duration? How many scored attempts per team per day?
+\item Are gates re-placed between runs, and to what tolerance?
+\item Are gates counted only in order --- does skipping one stop the count? Is a run that crashes
+after $N$ gates scored as $N$?
+\item Which camera sensor mode is the \SI{75}{\degree} figure quoted for, and can we change modes?
+\item Are all four drones on identical firmware and configuration? Is a barometer fitted?
+\item Where do we get the camera and serial demo applications?
+\item Exact as-built gate heights, and the upper opening height of the double gate.
+\end{enumerate}

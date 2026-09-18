@@ -1,0 +1,21 @@
+\begin{table}[H]\centering\footnotesize
+\begin{tabularx}{\linewidth}{@{}Xrrrr@{}}
+\toprule
+Test on the corrected simulator & \makecell{Gates per\\attempt} & \makecell{Crashes /\\100 gates} & \makecell{$P$(2 laps,\\no crash)} & \makecell{Median\\lap (s)} \\
+\midrule
+No disturbances -- Gene's model & 0.9 & 51.4 & 0\,\% & -- \\
+Expected disturbances -- Gene's model & 0.3 & 110.3 & 0\,\% & -- \\
+Expected disturbances, race start -- Gene's model & 0.6 & 70.3 & 0\,\% & -- \\
+Rougher disturbances -- Gene's model & 0.1 & 302.7 & 0\,\% & -- \\
+No disturbances -- 1-hour retrain & 1.2 & 59.7 & 0\,\% & -- \\
+Expected disturbances -- 1-hour retrain & 6.3 & 11.2 & 7\,\% & 11.01 \\
+Expected disturbances, race start -- 1-hour retrain & 4.7 & 11.8 & 6\,\% & 10.95 \\
+Rougher disturbances -- 1-hour retrain & 0.3 & 134.2 & 0\,\% & -- \\
+\bottomrule
+\end{tabularx}
+\caption{Gene's model vs the 1-hour retrain on the corrected simulator: official course and real \SI{74}{\degree} camera (512 drones, 25\,s each). ``Race start'' means every attempt starts in front of official gate~1. ``Expected'' and ``rougher'' apply all disturbances of that realism level at once (Section~\ref{sec:stress}). Gates per attempt counts every start-to-crash attempt; a crash rate above 100 means most attempts crash before passing a single gate.}\label{tab:retrain}
+\end{table}
+\begin{itemize}
+\item Clean playback from official gate~1, Gene's model: 11$\times$ 4 gates then collision; laps: no complete lap.
+\item Clean playback from official gate~1, the 1-hour retrain: 15$\times$ 2 gates then collision; laps: no complete lap.
+\end{itemize}
