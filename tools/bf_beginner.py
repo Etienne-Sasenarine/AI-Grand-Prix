@@ -356,7 +356,16 @@ def main() -> int:
             cli.command(line)
         print(f"  wrote {len(lines)} settings; saving (the board will reboot)")
         cli.leave(save=True)
-        print("  saved.")
+        print("  saved. Waiting for the flight controller to come back...")
+        if cli.verify_msp_returned():
+            print("  it is answering MSP again.")
+        else:
+            print()
+            print("  *** IT IS NOT ANSWERING. The settings were saved, but the")
+            print("  *** board has not come back on the serial link. Pull the")
+            print("  *** flight battery, wait, and plug it back in. This has")
+            print("  *** happened before and a power cycle fixed it.")
+            return 5
         print()
         print("  NOW, PROPS OFF: select the profiles and re-run --probe to confirm")
         print("  they took, then do the three bench checks above.")

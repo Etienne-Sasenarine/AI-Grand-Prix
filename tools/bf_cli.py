@@ -24,6 +24,12 @@ MSP framing" is about the binary protocol, and none of that is here.
 
 Safety
 ------
+* **THIS WEDGES THE FLIGHT CONTROLLER. Budget a battery pull.** Measured twice
+  out of two on 18 Sep: after a CLI session the board went silent on the UART at
+  every baud rate and stayed silent. Waiting did not help; pulling the flight
+  battery and plugging it back in did, both times. The ``save`` still took
+  effect. **Never run this near a scored run or with a packed flight line**, and
+  never assume the aircraft is usable afterwards without checking.
 * **Only works while disarmed.** The FC ignores the switch otherwise.
 * **It takes the MSP port down** for as long as the session lasts, so nothing
   else can poll telemetry meanwhile. Do not run this during a flight.
@@ -241,16 +247,70 @@ class BetaflightCLI:
             raise CLIError(out.strip())
         return out
 
-    def leave(self, *, save: bool = False) -> None:
-        """Reboot out of CLI. ``save`` writes the EEPROM first."""
+    def leave(self, *, save: bool = False, settle_s: float = 6.0) -> None:
+        """Reboot out of CLI, and wait for the board to come back.
+
+        ``save`` writes the EEPROM first. Either way the flight controller
+        reboots, and while it reboots it speaks nothing at all.
+
+        **Why the wait is long and why we drain the port.** An earlier version
+        wrote ``exit``, slept 200 ms and closed the serial port. On 18 Sep that
+        left the flight controller silent on every baud rate for forty minutes,
+        and it took a physical battery pull to recover. In the field that is a
+        lost session, or a lost scored run. Closing the port out from under a
+        rebooting board is not worth the 5.8 seconds saved, so we now send the
+        command, read until it goes quiet, and give it time to come back up.
+        """
         if not self._entered:
             return
         try:
             self.ser.write((b"save\r\n" if save else b"exit\r\n"))
-            time.sleep(0.2)
-            self.ser.read(4096)
+            # Drain whatever it says on the way down, rather than yanking the
+            # port mid-sentence.
+            deadline = time.monotonic() + settle_s
+            quiet_since = None
+            while time.monotonic() < deadline:
+                chunk = self.ser.read(4096)
+                if chunk:
+                    quiet_since = None
+                else:
+                    quiet_since = quiet_since or time.monotonic()
+                    if time.monotonic() - quiet_since > 2.0:
+                        break
+                time.sleep(0.05)
         finally:
             self._entered = False
+
+    def verify_msp_returned(self, *, timeout_s: float = 12.0) -> bool:
+        """After leaving CLI, check the board is answering MSP again.
+
+        A tool that silently leaves the flight controller wedged is worse than
+        one that fails loudly, because the wedge is only discovered later by
+        something that matters.
+        """
+        import sys as _sys
+        from pathlib import Path as _Path
+        _sys.path.insert(0, str(_Path(__file__).resolve().parent))
+        deadline = time.monotonic() + timeout_s
+        port = getattr(self.ser, "port", None)
+        if self.is_mock or not port:
+            return True
+        try:
+            self.ser.close()
+        except Exception:
+            pass
+        while time.monotonic() < deadline:
+            try:
+                from mock_link import open_link      # noqa: E402
+                fc = open_link(port)
+                try:
+                    fc.attitude()
+                    return True
+                finally:
+                    fc.close()
+            except Exception:
+                time.sleep(1.0)
+        return False
 
     def close(self) -> None:
         try:
