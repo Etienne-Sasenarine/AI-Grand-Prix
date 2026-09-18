@@ -16,6 +16,38 @@ That dependency is now gone. **The drone records itself.**
 
 ---
 
+## Step 0 — make the ANGLE switch work (once, ~5 minutes)
+
+**Do this first. Nothing else matters as much.**
+
+The transmitter has a switch labelled **ACRO / ANGLE**. It currently does
+nothing: Betaflight has no ANGLE assignment to listen with, so the aircraft is
+always in acro — full manual, no self-levelling. That is the hardest possible
+way to fly a 1745 g 8-inch quad, and it is why the last attempts were hard.
+
+Find which channel the switch drives:
+
+```
+python3 ~/aigp/setup_angle_mode.py --dev /dev/ttyTHS1 --watch
+```
+
+Flip the ACRO/ANGLE switch a few times while that runs. It prints the channel.
+Then assign it:
+
+```
+python3 ~/aigp/setup_angle_mode.py --dev /dev/ttyTHS1 --assign --channel <N> --yes
+```
+
+This goes over MSP, **not** the Betaflight CLI, so it will not wedge the board.
+It refuses to touch an occupied slot, refuses to share a channel with another
+mode, and reads the assignment back before and after saving.
+
+**Then bench test it, propellers off:** select ANGLE, throttle up slightly, tilt
+the aircraft. The low motor should spin up and hold until you level it again. If
+it does not, ANGLE is not active and there is no point flying.
+
+---
+
 ## Before you leave the bench (once, ~5 minutes)
 
 Install the recorder so it starts on boot. This needs the drone reachable, so do
@@ -81,11 +113,21 @@ passes through Betaflight's throttle curve first and is a different number.
 
 ## What you get from one flight
 
+```
+python3 ~/aigp/analyze_thrust.py ~/flights/flight_<...>.csv
+```
+
+gives thrust-to-weight from the same recording. It uses **rotor speed, not the
+accelerometer** — the accelerometer is biased low by about 0.37 g at full
+throttle through vibration, which is a third of the signal, and would make the
+aircraft look weaker than it is. Mass never enters the calculation: it cancels
+between the hover and the burst.
+
 | Measurement | From |
 |---|---|
 | **Hover throttle** | the marked hovers |
 | **Thrust coefficient** | the same hovers — bidirectional DShot is on, so per-motor RPM is logged |
-| **Thrust-to-weight** | the full-throttle climb |
+| **Thrust-to-weight** | the full-throttle climb, via RPM |
 | **Hover attitude bias** | free, from the same data — it adds to the camera tilt |
 | **Battery sag** | the whole recording |
 | **Real telemetry rate** | the row timestamps |

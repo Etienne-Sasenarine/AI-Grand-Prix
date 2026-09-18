@@ -31,6 +31,9 @@ SUITES = [
     ("TEST 3 camera capture", "test_camera_capture.py", ["--self-test"]),
     ("unattended flight recorder", "flight_recorder.py", ["--self-test"]),
     ("flight analysis (RC marks)", "analyze_flight.py", ["--self-test"]),
+    ("thrust-to-weight analysis", "analyze_thrust.py", ["--self-test"]),
+    ("ANGLE mode assignment", "setup_angle_mode.py", ["--self-test"]),
+    ("END-TO-END fly/record/analyse", "test_end_to_end.py", []),
 ]
 
 

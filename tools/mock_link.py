@@ -86,6 +86,19 @@ class MockLink:
         #: trusted -- see test_camera_capture.py, which runs beside a pilot with
         #: propellers on and must never command anything.
         self.commands_received = 0
+        #: Mode ranges as (permanentId, auxChannelIndex, startStep, endStep),
+        #: seeded with what the real airframe actually carries (read off
+        #: dcl-orin on 18 Sep): ARM on aux0, four others, and ANGLE assigned to
+        #: nothing. A tool that fixes ANGLE has to work against this shape.
+        #: Steps are (microseconds - 900) / 25.
+        self.mode_ranges = [(0, 0, 28, 48), (40, 6, 6, 48), (41, 2, 28, 48),
+                            (43, 5, 28, 48), (50, 4, 32, 48)] + [(0, 0, 0, 0)] * 15
+        self.eeprom_writes = 0
+        #: Motor poles, for the RPM telemetry reply.
+        self.motor_poles = 14
+        #: Aux channel overrides, {1-based RC channel: microseconds}. Lets a
+        #: test drive the marker switch the pilot would flip.
+        self.aux: dict = {}
 
     # ------------------------------------------------------------- driving it
     def command(self, throttle: float, rates_rad_s=(0.0, 0.0, 0.0)) -> None:
@@ -150,11 +163,20 @@ class MockLink:
                 "rssi": 1000}
 
     def rc_channels(self):
-        """The channels the FC is acting on, in 1000-2000 microseconds."""
+        """The channels the FC is acting on, in 1000-2000 microseconds.
+
+        Sixteen of them, like the real link, so a tool that searches the aux
+        channels for a marker switch has somewhere to search.
+        """
         def us(x):
             return int(1000 + 1000 * min(max(x, 0.0), 1.0))
         mid = [500 + 500 * (r / max(self.cfg.rate_limit, 1e-6)) for r in self._rate_cmd]
-        return [us(self._throttle)] + [int(1000 + m) for m in mid] + [1000] * 4
+        ch = [us(self._throttle)] + [int(1000 + m) for m in mid] + [1500] * 12
+        ch[4] = 1800 if self._armed else 1000        # ch5: the arming switch
+        for k, v in self.aux.items():
+            if 1 <= k <= 16:
+                ch[k - 1] = int(v)
+        return ch[:16]
 
     def motors(self):
         """Per-motor output, 1000-2000. Sags with the pack, as a real one does.
@@ -216,6 +238,45 @@ class MockLink:
 
     def decode_sensor_flags(self, *_a, **_k):
         return ["ACC", "BARO", "GYRO"]
+
+    def request(self, cmd, payload=b"", timeout=None, retries=2):
+        """The generic MSP call. Only the commands our tools actually use."""
+        import struct as _s
+        if cmd == 34:                                   # MSP_MODE_RANGES
+            out = bytearray()
+            for pid, aux, a, b in self.mode_ranges:
+                out += bytes([pid, aux, a, b])
+            return bytes(out)
+        if cmd == 35:                                   # MSP_SET_MODE_RANGE
+            if len(payload) < 5:
+                raise ValueError("MSP_SET_MODE_RANGE needs 5 bytes")
+            idx, pid, aux, a, b = payload[0], payload[1], payload[2], payload[3], payload[4]
+            if idx >= len(self.mode_ranges):
+                raise IndexError("mode range index out of bounds")
+            self.mode_ranges[idx] = (pid, aux, a, b)
+            return b""
+        if cmd == 250:                                  # MSP_EEPROM_WRITE
+            self.eeprom_writes += 1
+            return b""
+        if cmd == 119:                                  # MSP_BOXIDS
+            return bytes([0, 1, 2, 6, 27, 46, 7, 8, 13, 19, 20, 26, 30, 31, 32,
+                          33, 34, 35, 36, 37, 39, 45, 40, 41, 43, 48, 49, 50,
+                          51, 52, 53])
+        if cmd == 139:                                  # MSP_MOTOR_TELEMETRY
+            # RPM follows the motor output, quadratically-ish in the real world;
+            # here linear is enough to exercise the parsing and the plumbing.
+            # Thrust in this model is LINEAR in throttle, and a propeller's
+            # thrust goes as RPM squared -- so RPM must go as the square root of
+            # throttle for the two to be consistent. Getting this right is what
+            # makes (rpm_full / rpm_hover)^2 come out at 1 / hover_throttle,
+            # which is a real check of the analysis rather than a tautology.
+            out = bytearray([4])
+            for m in self.motors()[:4]:
+                frac = max(0.0, (m - 1000) / 1000.0)
+                rpm = int(9600 * math.sqrt(frac))
+                out += _s.pack("<I", int(rpm * (self.motor_poles / 2) / 100)) + b"\x00\x00"
+            return bytes(out)
+        raise NotImplementedError(f"mock does not implement MSP command {cmd}")
 
     def close(self):
         self.closed = True
