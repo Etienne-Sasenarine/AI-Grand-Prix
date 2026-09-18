@@ -94,10 +94,39 @@ class MockSerial:
         "get rc_smoothing": "rc_smoothing = ON\n",
     }
 
+    #: Settings this double will answer ``get`` for, with stock Betaflight 4.4
+    #: style values. Anything not listed answers like an unknown setting, which
+    #: is what lets bf_beginner.py's name-discovery be tested offline.
+    #:
+    #: NOTE: these are a TEST DOUBLE's values, not a measurement of any drone.
+    #: The canned ``diff all`` above was written from another team's published
+    #: dump, and at least once it has been mistaken for our own airframe's
+    #: configuration -- see the CONFLICT note in SPEC.md. Never quote numbers
+    #: from this file as measurements.
+    SETTINGS = {
+        # Names and values as probed off the real 4.4.3 board on 18 Sep, so
+        # offline runs behave the way the hardware does.
+        "level_limit": "55", "angle_level_strength": "50",
+        "horizon_level_strength": "50", "horizon_transition": "75",
+        "thr_mid": "50", "thr_expo": "0",
+        "roll_rc_rate": "100", "pitch_rc_rate": "100", "yaw_rc_rate": "100",
+        "roll_srate": "70", "pitch_srate": "70", "yaw_srate": "70",
+        "roll_expo": "0", "pitch_expo": "0", "yaw_expo": "0",
+        "rates_type": "ACTUAL",
+        "throttle_limit_type": "OFF", "throttle_limit_percent": "100",
+        "rc_smoothing": "ON", "rc_smoothing_auto_factor": "30",
+        "failsafe_procedure": "DROP", "small_angle": "25",
+        "crash_recovery": "OFF", "acro_trainer_angle_limit": "20",
+    }
+
     def __init__(self) -> None:
         self.buf = b""
         self.in_cli = False
         self.rebooted = False
+        #: Every write the double accepted, so a tool that claims to touch only
+        #: certain profiles can be checked rather than believed.
+        self.writes = []
+        self.saved = False
 
     def write(self, data: bytes) -> int:
         text = data.decode("utf-8", "replace")
@@ -111,11 +140,36 @@ class MockSerial:
             if not cmd:
                 continue
             if cmd in REBOOTS:
+                if cmd.lower() == "save":
+                    self.saved = True
                 self.buf += b"\r\nRebooting\r\n"
                 self.rebooted = True
                 self.in_cli = False
                 continue
-            body = self.CANNED.get(cmd, f"###ERROR: unknown command '{cmd}'\r\n")
+            body = self.CANNED.get(cmd)
+            if body is None and cmd.lower().startswith("get "):
+                key = cmd[4:].strip()
+                val = self.SETTINGS.get(key)
+                body = (f"{key} = {val}\n" if val is not None
+                        else f"###ERROR: Invalid name\n")
+            if body is None and cmd.lower().startswith("set "):
+                key = cmd[4:].split("=", 1)[0].strip()
+                if key in self.SETTINGS:
+                    val = cmd.split("=", 1)[1].strip()
+                    self.SETTINGS[key] = val
+                    self.writes.append(cmd)
+                    body = f"{key} set to {val}\n"
+                else:
+                    body = "###ERROR: Invalid name\n"
+            if body is None and cmd.lower().split()[0] in ("profile", "rateprofile"):
+                self.writes.append(cmd)
+                body = f"{cmd}\n"
+            if body is None and cmd.lower() == "dump all":
+                body = "# dump all\n" + "".join(
+                    f"set {k} = {v}\n" for k, v in sorted(self.SETTINGS.items())) \
+                    + "\n".join(f"# filler {i}" for i in range(60)) + "\n"
+            if body is None:
+                body = f"###ERROR: unknown command '{cmd}'\r\n"
             self.buf += body.replace("\n", "\r\n").encode() + PROMPT.encode()
         return len(data)
 

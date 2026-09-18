@@ -24,6 +24,7 @@ SUITES = [
     ("hover analysis", "analyze_hover.py", ["--self-test"]),
     ("rate step analysis", "analyze_rates.py", ["--self-test"]),
     ("Betaflight CLI bridge", "bf_cli.py", ["--self-test"]),
+    ("beginner flight setup", "bf_beginner.py", ["--self-test"]),
     ("RPM telemetry helper", "fc_rpm.py", []),
     ("TEST 1 hover throttle", "test_hover.py", ["--self-test"]),
     ("TEST 2 max thrust", "test_max_thrust.py", ["--self-test"]),

@@ -153,6 +153,14 @@ class TelemetryRecorder:
     mid-flight we would rather keep taking pictures than lose the session.
     """
 
+    #: One sample costs several MSP round trips, and the organizers put the
+    #: link at 30-50 Hz for a *single* request. Polling everything every cycle
+    #: therefore caps the sample rate at a few Hz. Attitude, gyro, motors and
+    #: sticks change frame to frame and are read every cycle; battery, altitude
+    #: and the armed flag change slowly, so they are refreshed every Nth cycle
+    #: and carried forward in between.
+    SLOW_EVERY = 10
+
     def __init__(self, fc, hz: float = 50.0):
         self.fc = fc
         self.period = 1.0 / max(hz, 1e-6)
@@ -160,17 +168,29 @@ class TelemetryRecorder:
         self.errors = 0
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
+        self._cycle = 0
+        self._slow = {"armed": False, "voltage_v": "", "current_a": "",
+                      "altitude_m": "", "vario_m_s": ""}
 
     def _poll_once(self) -> dict:
         roll, pitch, yaw = self.fc.attitude()
         acc, gyro, _ = self.fc.raw_imu()
         motors = self.fc.motors()
         rc = self.fc.rc_channels()
-        batt = self.fc.analog()
-        alt, vario = self.fc.altitude()
-        st = self.fc.status()
+        if self._cycle % self.SLOW_EVERY == 0:
+            batt = self.fc.analog()
+            alt, vario = self.fc.altitude()
+            st = self.fc.status()
+            self._slow = {
+                "armed": bool(st.get("armed", False)),
+                "voltage_v": batt.get("voltage_v", ""),
+                "current_a": batt.get("current_a", ""),
+                "altitude_m": round(float(alt), 3),
+                "vario_m_s": round(float(vario), 4),
+            }
+        self._cycle += 1
         return {
-            "armed": bool(st.get("armed", False)),
+            **self._slow,
             "roll_deg": round(roll, 3), "pitch_deg": round(pitch, 3),
             "yaw_deg": round(yaw, 3),
             "gyro_x_raw": gyro[0], "gyro_y_raw": gyro[1], "gyro_z_raw": gyro[2],
@@ -182,10 +202,6 @@ class TelemetryRecorder:
             "rc_roll": rc[1] if len(rc) > 1 else "",
             "rc_pitch": rc[2] if len(rc) > 2 else "",
             "rc_yaw": rc[3] if len(rc) > 3 else "",
-            "voltage_v": batt.get("voltage_v", ""),
-            "current_a": batt.get("current_a", ""),
-            "altitude_m": round(float(alt), 3),
-            "vario_m_s": round(float(vario), 4),
         }
 
     def _run(self) -> None:
@@ -199,9 +215,20 @@ class TelemetryRecorder:
             if slack > 0:
                 self._stop.wait(slack)
 
-    def start(self) -> "TelemetryRecorder":
+    def start(self, *, wait_first_s: float = 6.0) -> "TelemetryRecorder":
+        """Start polling and wait for the first sample to prove the link works.
+
+        The wait is generous on purpose. ``MSPLink.request`` retries twice with
+        a 0.5 s timeout, so a single slow field can take over a second, and one
+        sample is several requests. An earlier version waited 0.3 s, decided the
+        flight controller was not answering, and refused to record -- against a
+        flight controller that was answering perfectly well.
+        """
         self._thread = threading.Thread(target=self._run, name="telemetry", daemon=True)
         self._thread.start()
+        deadline = time.monotonic() + wait_first_s
+        while time.monotonic() < deadline and not self.samples:
+            time.sleep(0.05)
         return self
 
     def stop(self) -> None:
@@ -688,14 +715,15 @@ def main() -> int:
                 print("  images only.")
                 return 3
             telemetry = TelemetryRecorder(fc, hz=args.telem_hz).start()
-            time.sleep(0.3)                          # let a few samples land
             if not telemetry.samples:
                 telemetry.stop()
-                print(f"\n  opened {args.dev} but read nothing back. The port is")
-                print("  there; the flight controller is not answering on it.")
+                print(f"\n  opened {args.dev} but read nothing back in 6 s.")
+                print("  The port exists; the flight controller is not answering.")
+                print("  Check it is powered and not mid-reboot -- leaving the")
+                print("  Betaflight CLI reboots it, which takes a few seconds.")
                 return 3
             print(f"  telemetry live on {args.dev} "
-                  f"({len(telemetry.samples)} samples in 0.3 s)\n")
+                  f"({len(telemetry.samples)} sample(s) to first read)\n")
         try:
             meta = capture(Path(args.out), seconds=args.seconds, fps=args.fps,
                            width=args.width, height=args.height, sensor_id=args.sensor_id,

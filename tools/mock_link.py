@@ -237,11 +237,23 @@ def open_link(dev: str | None, *, baud: int = 115200, cfg: MockConfig | None = N
     if dev in (None, "", "mock"):
         return MockLink(cfg)
     import sys
-    for p in ("/home/dcl/target/msp", "./target/msp", "../target/msp"):
+    for p in ("/home/dcl/target/msp", "./target/msp", "../target/msp",
+              "../../target/msp"):
         if p not in sys.path:
             sys.path.insert(0, p)
     from msp import MSPLink  # noqa: E402  — only on the drone
-    return MSPLink(dev, baud)
+    link = MSPLink(dev, baud)
+    # MSPLink's constructor does NOT open the port: it leaves ``_ser`` as None
+    # and every accessor then dies with "'NoneType' object has no attribute
+    # 'write'". ``open()`` is what creates the serial port and starts the
+    # background receive thread, and it returns self.
+    #
+    # This cost us a real debugging session on 18 Sep: the whole tool suite
+    # passed against MockLink, which needs no opening, and then failed at first
+    # contact with the flight controller. The mock hid it, so the mock is not
+    # enough on its own.
+    link.open()
+    return link
 
 
 def _self_test() -> None:

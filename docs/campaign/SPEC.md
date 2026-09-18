@@ -161,6 +161,7 @@ anything could have moved since. Grade before use:
 
 | Quantity | Value | Tag |
 |---|---|---|
+| ✅ **Verified on the real airframe** | `get` over the CLI on dcl-orin, 18 Sep: `thr_mid 54`, `thr_expo 68`, `roll/pitch_rc_rate 55`, `yaw_rc_rate 57`, `roll/pitch_srate 75`, `yaw_srate 70`, `rates_type BETAFLIGHT`. **The rows below are correct** | **[MEAS]** 18 Sep, `tools/bf_beginner.py --probe --dev /dev/ttyTHS1` | An earlier note here doubted these because our `diff all` (`logs/orin/diff_all.txt`) shows every `profile` and `rateprofile` block empty. **That was a misreading of `diff`.** The board reports `# config: YES`: Betaflight 4.4 applies a board/vendor configuration on top of defaults, and `diff` prints only what differs *from that*, so vendor-set values are invisible to it. **Use `get` or `dump all`, never `diff`, to read what the aircraft is actually running.** The agreement with [SAURON] is real: both teams fly the same vendor config |
 | `rates_type` | **BETAFLIGHT** | **[MEAS]** 18 Sep, our airframe via CLI |
 | Roll / pitch `rc_rate` · `srate` | **0.55 · 0.75** (`expo` 0) | **[MEAS]** 18 Sep — matches [SAURON] exactly |
 | Yaw `rc_rate` · `srate` | **0.57 · 0.70** | [SAURON] |
