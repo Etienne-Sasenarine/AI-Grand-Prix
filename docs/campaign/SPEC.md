@@ -72,6 +72,8 @@ says which we follow and why.
 **Licence: none.** Facts and measurements only — **never their code.** Do not copy files,
 functions or structure from that repository.
 
+**19 Sep — promoted to reference design.** They are through five gates on this airframe and we cannot yet hover, so where a [SAURON] *setup or method* exists, it is now the thing to reproduce first, not a hint to weigh: ANGLE always on (`aux 5 1 4 900 2100`), override mask **4** (throttle only, pilot flies attitude), no barometer height, gate-fix height, 25 Hz commands. Their *numbers* still need confirming on our airframe. Their repository went private after 17 Sep; everything we hold is in `research/06_georgia_tech_reference.md`. **Still never copy their code** — no licence.
+
 **Not all [SAURON] values are equally good.** Their repo is a working log, not a results document —
 some entries are superseded, some tables were never filled in, and their newest commit is 17 Sep, so
 anything could have moved since. Grade before use:
