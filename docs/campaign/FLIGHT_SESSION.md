@@ -16,70 +16,67 @@ That dependency is now gone. **The drone records itself.**
 
 ---
 
-## Step 0 — make ANGLE the default (once, ~10 minutes, propellers off)
+## Step 0 — make ANGLE the default (once per drone, ~5 minutes, propellers off)
 
 **Do this first. Nothing else matters as much.**
 
 ANGLE is Betaflight's self-levelling mode: let go of the right stick and the
 aircraft levels itself. ACRO is full manual: it stays at whatever lean you left
-it. The transmitter has a switch labelled **ACRO / ANGLE**, and it currently does
-nothing — Betaflight has no ANGLE assignment to listen with, so the aircraft is
-**always in ACRO**. That is the hardest possible way to fly a 1745 g 8-inch quad,
-and it is why the last attempts were hard.
+it. Out of the box Betaflight has **no ANGLE assignment at all**, so the aircraft
+is always in ACRO — the hardest possible way to fly a 1745 g 8-inch quad, and why
+the last attempts were hard.
 
-The fix makes **ANGLE what you get without touching anything**. ACRO becomes a
-deliberate flip, all the way to the end of the switch.
+**What the one command below sets up:**
 
-**If the recorder service below is already installed, stop it first**
-(`sudo systemctl stop aigp-recorder`, and `start` it again afterwards). The
-flight controller's serial port can only be open in one program at a time, and
-the recorder holds it from boot — every other tool fails to open it until then.
+| Who is flying | Switch | What the drone does |
+|---|---|---|
+| **A person** (the normal, resting position) | autonomy switch **off** | **ANGLE** — self-levelling, leans 25° at most |
+| **The Jetson** | autonomy switch **on** | **ACRO** — what the trained policy expects |
 
-**1. Find the switch, and which end is ACRO:**
+"The autonomy switch" is whichever switch engages **MSP override**, Betaflight's
+name for handing the sticks to the Jetson. The command reads that off the flight
+controller and puts ANGLE on every *other* position of the same channel, so there
+is nothing to look up and nothing that can be left in the wrong position. Taking
+the aircraft back from the Jetson puts it straight back into ANGLE.
 
-```
-python3 ~/aigp/setup_angle_mode.py --dev /dev/ttyTHS1 --watch
-```
+**⚠ The label on the transmitter is not to be trusted.** The switch marked
+ACRO / ANGLE does *not* select ANGLE, and flipping it to "ANGLE" has made the
+drone die (reported 18 Sep) — most likely because that position is the autonomy
+switch, and it handed roll, pitch and yaw to a Jetson that was not flying.
+**Never flip to the autonomy position unless the autonomy program is running.**
 
-Flip the ACRO/ANGLE switch a few times while that runs, and **leave it on ACRO**
-before the minute is up. It prints the channel and a `now` value — that is what
-the channel reads on ACRO.
+If the recorder service below is already installed, stop it first
+(`sudo systemctl stop aigp-recorder`, and `start` it again afterwards): the
+flight controller's serial port can only be open in one program at a time.
 
-**2. Assign it:**
-
-```
-python3 ~/aigp/setup_angle_mode.py --dev /dev/ttyTHS1 --assign --channel <N> --acro-at <now> --yes
-```
-
-It prints `DEFAULT (switch untouched): ANGLE` when it has worked. If an earlier
-run already assigned ANGLE the old way round, it says so and asks for
-`--reassign`.
-
-**3. Limit the tilt** to a beginner figure. The airframe ships at 55°, a racing
-number; 25° is the published beginner one:
+**1. Look, without changing anything:**
 
 ```
-python3 ~/aigp/setup_angle_mode.py --dev /dev/ttyTHS1 --tilt-limit 25 --yes
+python3 ~/aigp/setup_angle_mode.py --dev /dev/ttyTHS1 --beginner --dry-run
 ```
 
-This only exists in self-levelling modes, so it changes nothing about ACRO.
-Nothing here touches the rates or the throttle curve.
+**2. Do it:**
 
-All of this goes over MSP, **not** the Betaflight CLI, so it will not wedge the
-board. It refuses to touch another mode's slot, refuses to share a channel,
-refuses to write while armed, and reads everything back before saving.
-**It has not yet run on the real flight controller** — it passes against a mock
-shaped like ours — so add `--dry-run` first and read what it says it will do.
+```
+python3 ~/aigp/setup_angle_mode.py --dev /dev/ttyTHS1 --beginner --yes
+```
 
-**4. Bench test, propellers off:** leave the switch alone, throttle up slightly,
-tilt the aircraft. The low motor should spin up and hold until you level it
-again. If it does not, ANGLE is not active and there is no point flying. Then
-flip to ACRO and tilt again: the motors should *not* fight you. Flip back.
+It finishes by reading the flight controller's own state back and printing
+`ANGLE -- self-levelling is ON`. It goes over MSP, **not** the Betaflight CLI, so
+it will not wedge the board; it refuses to write while armed, touches no other
+mode, reads everything back before saving, and changes nothing about ACRO, the
+rates or the throttle curve. **It has not yet run on a real flight controller** —
+it passes against a mock shaped like ours — which is what step 1 and step 3 are
+for. It is per drone: a replacement airframe needs it again.
 
-**The one time the switch must be on ACRO is an autonomous run.** The trained
-policy commands rotation rates, which is what ACRO means, and the Jetson cannot
-flip the switch for you — it only takes over the four sticks. If the pilot takes
-the aircraft back mid-run: override switch off **and** ANGLE switch on, together.
+**3. Bench test, propellers off:** throttle up slightly and tilt the aircraft by
+hand. The low motors should spin up and hold until you level it again. If they
+do not, ANGLE is not active and there is no point flying.
+
+**To find out which switch is the autonomy switch** (worth a minute, no drone
+needed): on the transmitter open the servo monitor (Linkage menu), flip each
+switch, and note which one moves **channel 9**. That one, pushed to its far end,
+is the autonomy switch. `--watch` shows the same thing from the Jetson.
 
 ---
 

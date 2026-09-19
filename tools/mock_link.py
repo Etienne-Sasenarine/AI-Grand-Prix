@@ -221,8 +221,34 @@ class MockLink:
         """
         return (0.0, 0.0)
 
+    #: What MSP_BOXIDS returns on the real airframe (read 18 Sep). The position of
+    #: an id in this list is its bit in ``flight_mode_flags``.
+    BOX_IDS = [0, 1, 2, 6, 27, 46, 7, 8, 13, 19, 20, 26, 30, 31, 32,
+               33, 34, 35, 36, 37, 39, 45, 40, 41, 43, 48, 49, 50, 51, 52, 53]
+
+    def box_ids(self):
+        return list(self.BOX_IDS)
+
+    def _mode_active(self, permanent_id: int) -> bool:
+        """Is any range for this mode switched on by the current channel values?"""
+        rc = self.rc_channels()
+        for pid, aux, a, b in self.mode_ranges:
+            if pid != permanent_id or a >= b:
+                continue
+            v = rc[4 + aux] if 4 + aux < len(rc) else 1500
+            if 900 + 25 * a <= v < 900 + 25 * b:
+                return True
+        return False
+
     def status(self):
-        return {"cycle_time_us": 125, "i2c_errors": 0, "flight_mode_flags": 1,
+        # ARM follows the test hook; ANGLE follows the mode ranges and the
+        # switches, the way the real flight controller reports it.
+        flags = 0
+        if self._armed:
+            flags |= 1 << self.BOX_IDS.index(0)
+        if self._mode_active(1):
+            flags |= 1 << self.BOX_IDS.index(1)
+        return {"cycle_time_us": 125, "i2c_errors": 0, "flight_mode_flags": flags,
                 "arming_flags": 0, "armed": self._armed,
                 "pid_profile": self.pid_profile}
 
@@ -315,9 +341,7 @@ class MockLink:
                 self.profile_selects += 1
             return b""
         if cmd == 119:                                  # MSP_BOXIDS
-            return bytes([0, 1, 2, 6, 27, 46, 7, 8, 13, 19, 20, 26, 30, 31, 32,
-                          33, 34, 35, 36, 37, 39, 45, 40, 41, 43, 48, 49, 50,
-                          51, 52, 53])
+            return bytes(self.BOX_IDS)
         if cmd == 139:                                  # MSP_MOTOR_TELEMETRY
             # RPM follows the motor output, quadratically-ish in the real world;
             # here linear is enough to exercise the parsing and the plumbing.
