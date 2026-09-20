@@ -315,12 +315,30 @@ class GateTargetingCommand(CommandTerm):
         self._gate_passed[env_ids] = False
         self._gate_missed[env_ids] = False
 
-    def _update_command(self):
-        if self.cfg.record_fpv:
-            image = self.sensor.data.output["rgb"][0].cpu().numpy()
-            image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
-            self.out.write(image)
+        # The index just changed and the drone has just been teleported. Publish
+        # the matching pose now rather than leaving the previous episode's gate
+        # standing until the next ``_update_command``, which the step loop does
+        # not reach until after terminations have already been judged against it.
+        self._refresh_gate_poses()
 
+    def _refresh_gate_poses(self):
+        """Republish the target and lookahead poses from ``next_gate_idx``.
+
+        Called from both ``_resample_command`` and ``_update_command``, because
+        the index and the pose must never disagree.
+
+        They used to. Only ``_update_command`` wrote these, and Isaac Lab runs
+        ``command_manager.compute()`` *after* the termination and reward
+        managers. So for exactly one step following an explicit ``env.reset()``
+        the pose described the previous episode's gate while the drone had
+        already been teleported somewhere else on the course -- and on a
+        freshly built env it was still the (0, 0, 0) these buffers are
+        initialised to. ``flyaway`` measures distance to this pose and fired
+        for 48 of 64 envs on step one, at zero speed, before the policy had
+        done anything at all.
+
+        Idempotent and cheap: two gathers, no state beyond the two buffers.
+        """
         next_gate_positions = self.track.data.object_com_pos_w[self.env_ids, self.next_gate_idx]
         next_gate_orientations = self.track.data.object_quat_w[self.env_ids, self.next_gate_idx]
         self.next_gate_w = torch.cat([next_gate_positions, next_gate_orientations], dim=1)
@@ -340,6 +358,14 @@ class GateTargetingCommand(CommandTerm):
             ],
             dim=1,
         )
+
+    def _update_command(self):
+        if self.cfg.record_fpv:
+            image = self.sensor.data.output["rgb"][0].cpu().numpy()
+            image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
+            self.out.write(image)
+
+        self._refresh_gate_poses()
 
         # Gate passing logic
         (roll, pitch, yaw) = math_utils.euler_xyz_from_quat(self.next_gate_w[:, 3:7])
