@@ -62,3 +62,6 @@ NUL
 # dataset the notebook trained on (frames/ is ~75 MB of JPGs + COCO json).
 inference/frames/
 !inference/best.pt
+
+# Dataset downloads (e.g. the Roboflow export): hundreds of MB, never for git
+*.zip
