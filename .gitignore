@@ -58,5 +58,7 @@ runs/
 nul
 NUL
 
-# Shipped gate-pose weights for inference/inference.py
+# inference/: keep the shipped gate-pose weights, ignore the local Roboflow
+# dataset the notebook trained on (frames/ is ~75 MB of JPGs + COCO json).
+inference/frames/
 !inference/best.pt
