@@ -38,11 +38,13 @@ TRAINING_FX = TRAINING_FY = 320.0
 TRAINING_CX, TRAINING_CY = 320.0, 180.0
 TRAINING_TILT_DEG = 20.0
 
-#: What the real camera actually is. Three independent calibrations of this
-#: model give fx in 423.6-426.7 at 640x360; the spec's nominal 75 deg would be
-#: 417.0. Use the measurements until we calibrate our own.
-REAL_FX = REAL_FY = 425.0
-REAL_CX, REAL_CY = 322.0, 168.0
+#: On-site ChArUco at 1920x1080, scaled to 640x360.
+REAL_FX = 1302.941063 * (FRAME_W / 1920.0)
+REAL_FY = 1303.105865 * (FRAME_W / 1920.0)
+REAL_CX = 952.287144 * (FRAME_W / 1920.0)
+REAL_CY = 529.035788 * (FRAME_H / 1080.0)
+REAL_DIST_K = (0.047494607, -0.182658343, 0.153277219)
+REAL_DIST_P = (0.001303410, 0.000583514)
 
 #: **Camera tilt is locked at 20 degrees up.** Decided 17 Sep 2026; set it on
 #: the airframe and do not change it without re-running the visibility sweep.
@@ -237,6 +239,26 @@ def gate_corners_world(gate_pos_w: np.ndarray, gate_yaw: float,
     return np.asarray(gate_pos_w, dtype=np.float64).reshape(1, 3) + offset
 
 
+KEYPOINT_FLIP_LR = np.array([1, 0, 3, 2, 5, 4, 7, 6])
+
+
+def align_corners_to_view(
+    pts: np.ndarray,
+    gate_pos_w: np.ndarray,
+    gate_yaw: float,
+    drone_pos_w: np.ndarray,
+) -> np.ndarray:
+    """Camera-view keypoint ids. Flip L/R when looking against through."""
+    pts = np.asarray(pts, dtype=np.float64).reshape(-1, 3)
+    through = np.array([math.cos(gate_yaw), math.sin(gate_yaw), 0.0])
+    rel = np.asarray(drone_pos_w, dtype=np.float64).reshape(3)[:3] - np.asarray(
+        gate_pos_w, dtype=np.float64
+    ).reshape(3)[:3]
+    if float(np.dot(rel, through)) > 0.0:
+        return pts[KEYPOINT_FLIP_LR]
+    return pts
+
+
 def quat_rotate_inverse(q_wxyz: np.ndarray, v: np.ndarray) -> np.ndarray:
     """Rotate world vectors into the body frame of a wxyz quaternion."""
     q = np.asarray(q_wxyz, dtype=np.float64)
@@ -412,6 +434,8 @@ class Camera:
     frame_h: float = FRAME_H
     off_frame_margin: float = OFF_FRAME_MARGIN
     offset_body_flu: tuple[float, float, float] = (0.0, 0.0, 0.0)
+    dist_k: tuple[float, float, float] = (0.0, 0.0, 0.0)
+    dist_p: tuple[float, float] = (0.0, 0.0)
     _r_cb: np.ndarray = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
@@ -432,7 +456,8 @@ class Camera:
         """
         return cls(fx=REAL_FX, fy=REAL_FY, cx=REAL_CX, cy=REAL_CY,
                    tilt_up_deg=tilt_up_deg,
-                   offset_body_flu=REAL_CAMERA_OFFSET_BODY_M)
+                   offset_body_flu=REAL_CAMERA_OFFSET_BODY_M,
+                   dist_k=REAL_DIST_K, dist_p=REAL_DIST_P)
 
     def hfov_deg(self) -> float:
         return 2.0 * math.degrees(math.atan((self.frame_w / 2.0) / self.fx))
@@ -453,8 +478,18 @@ class Camera:
 
         z = p_cam[:, 2]
         z_safe = np.where(np.abs(z) < 1e-6, 1e-6, z)
-        u = self.fx * (p_cam[:, 0] / z_safe) + self.cx
-        v = self.fy * (p_cam[:, 1] / z_safe) + self.cy
+        x = p_cam[:, 0] / z_safe
+        y = p_cam[:, 1] / z_safe
+        if any(self.dist_k) or any(self.dist_p):
+            r2 = np.minimum(x * x + y * y, 2.0)
+            r4 = r2 * r2
+            r6 = r4 * r2
+            radial = 1.0 + self.dist_k[0] * r2 + self.dist_k[1] * r4 + self.dist_k[2] * r6
+            x_d = x * radial + 2.0 * self.dist_p[0] * x * y + self.dist_p[1] * (r2 + 2.0 * x * x)
+            y_d = y * radial + self.dist_p[0] * (r2 + 2.0 * y * y) + 2.0 * self.dist_p[1] * x * y
+            x, y = x_d, y_d
+        u = self.fx * x + self.cx
+        v = self.fy * y + self.cy
 
         mx = self.off_frame_margin * self.frame_w
         my = self.off_frame_margin * self.frame_h

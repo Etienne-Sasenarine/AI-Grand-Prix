@@ -52,7 +52,8 @@ class DetectorModel:
                 continue
             if not self.behind_gate_visible and G.signed_distance_through(g, pos) > 0.0:
                 continue
-            uv, vis = camera.project(g.corners_world(), pos, quat)
+            pts = G.align_corners_to_view(g.corners_world(), g.centre, g.yaw, pos)
+            uv, vis = camera.project(pts, pos, quat)
             if not vis.any():
                 continue
             if rng.random() < self.dropout:
