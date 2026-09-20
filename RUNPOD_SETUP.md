@@ -309,11 +309,61 @@ df -h /dev/shm      # ours was 88G, fine; a 64M default would be a problem
 ulimit -n           # ours was 1024, too low
 ```
 
-Not confirmed as the fix. The retry with the limit raised was killed
-mid-startup before it could finish (see §7 — no tmux in the image either), so
-this remains untested. It is, however, a better-supported hypothesis than the
-IOMMU warning in §0: it explains a crash at extension-load time specifically,
-where IOMMU would more likely cause instability later or not at all.
+**Confirmed.** With the limit raised, Isaac Sim launches, steps PhysX and
+exits cleanly. The IOMMU warning in §0 is unrelated noise.
+
+### …but `ulimit` inside the script is not enough under tmux
+
+This cost a full diagnostic round. The tmux **server** is a daemon that
+outlives the SSH session that started it, and every pane it spawns inherits
+*its* limits. Start the server once from a 1024-limit shell — which is what
+any ordinary SSH session is — and `ulimit -n 65535` at the top of a script
+running in a new pane cannot raise it past what the server holds.
+
+The symptom is indistinguishable from the original crash: Isaac dies about
+7 seconds in, during extension load, with no traceback.
+
+Either raise the limit *before* the server starts, or kill the stale one:
+
+```bash
+tmux kill-server 2>/dev/null   # a server from an earlier session caps you
+ulimit -n 65535                # must precede the first tmux invocation
+tmux new-session -d -s train "bash run.sh > /tmp/run.log 2>&1"
+```
+
+Verify rather than assume — the check is two seconds and the failure looks
+like something else entirely:
+
+```bash
+tmux new-window -d "bash -c 'ulimit -n > /tmp/fd.txt'"; sleep 1; cat /tmp/fd.txt
+```
+
+## 9. Isaac Sim's exit is a hard exit: it eats both your output and your status
+
+`SimulationApp.close()` terminates the process without unwinding. Two
+consequences, and the second one is worse:
+
+* **`sys.exit(status)` after it never runs.** The shell sees 0 whatever
+  happened. Any script whose result you care about must print a verdict to
+  stdout; `$?` is not evidence. (This is separate from `isaaclab.sh` swallowing
+  exit codes — they compound, and either alone is enough to lose the status.)
+* **Buffered stdout is discarded.** Python block-buffers when redirected to a
+  file, so a script that ran perfectly and printed forty lines can leave a log
+  containing only the C++ warnings — those come from native code and are
+  unbuffered — followed by nothing.
+
+The combination reads exactly like the §8 segfault: a log that stops mid-way
+through startup and a clean exit code. It is not. Before concluding a run
+crashed, rerun it with:
+
+```bash
+export PYTHONUNBUFFERED=1 PYTHONFAULTHANDLER=1
+```
+
+`PYTHONUNBUFFERED` makes the output appear; `PYTHONFAULTHANDLER` prints a
+native traceback if it really is a segfault, which tells the two apart for
+good. Both belong in every script that launches Isaac, permanently — they cost
+nothing and they are the difference between a diagnosis and a guess.
 
 ## The start command that folds in everything learned
 

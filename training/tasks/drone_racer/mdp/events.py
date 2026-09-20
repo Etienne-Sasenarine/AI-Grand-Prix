@@ -228,6 +228,37 @@ def set_body_inertia(
 
     body_ids = asset.find_bodies(body_name)[0]
 
+    # Align the principal axes with the body axes before writing anything.
+    #
+    # PhysX does not store a 3x3. It stores three principal moments plus the
+    # rotation taking body axes to principal axes, and that rotation lives in
+    # the COM pose, not the inertia tensor. ``set_inertias`` writes the
+    # moments and leaves the rotation exactly where it was -- so writing a
+    # diagonal with zero products does not produce a diagonal read-back, and
+    # the products cannot be cleared by writing zeros into them.
+    #
+    # This asset's ``body`` link carries a 7.16 degree tilt about y from the
+    # USD conversion. Measured: the COM quaternion is
+    # (-0.000775, 0.062293, -0.003859, 0.99805), and the inertia read back as
+    # (0.004054, 0.0055, 0.007446) with 4.32e-4 in the products -- which is
+    # exactly R_y(7.16 deg) applied to what we wrote. The URDF has no products
+    # of inertia and neither does the airframe we are modelling, so the tilt
+    # is an artifact, and not a harmless one: a rotation about y couples roll
+    # into yaw on every input. The four prop links have identity here and read
+    # back clean, which is what confirmed the mechanism.
+    #
+    # Note the convention. This quaternion is **xyzw** -- the real part is
+    # last, which is how we could tell 0.99805 was a small rotation and not a
+    # large one. Isaac Lab's own math utilities are wxyz. Getting this
+    # backwards writes a 180 degree rotation about x, which happens to leave a
+    # diagonal tensor diagonal and would therefore pass the obvious check
+    # while being wrong.
+    coms = view.get_coms().clone()
+    identity_xyzw = torch.tensor([0.0, 0.0, 0.0, 1.0], dtype=coms.dtype)
+    for body_id in body_ids:
+        coms[env_ids, body_id, 3:7] = identity_xyzw
+    view.set_coms(coms, env_ids)
+
     # (num_instances, num_bodies, 9): each body's 3x3 inertia, row-major.
     inertias = view.get_inertias().clone()
     ixx, iyy, izz = inertia_diag

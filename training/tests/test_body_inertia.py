@@ -54,12 +54,27 @@ class FakeView:
         self.inertias[..., 8] = 0.006
         self.written_indices = None
 
+        # COM pose: position then an xyzw quaternion. Seeded with the tilt the
+        # real asset carries -- 7.16 degrees about y, measured on hardware --
+        # so the test exercises clearing something rather than confirming
+        # something already clear.
+        self.coms = torch.zeros(NUM_ENVS, NUM_BODIES, 7)
+        self.coms[..., 3:7] = torch.tensor([-0.000775, 0.062293, -0.003859, 0.99805])
+        self.coms_written_indices = None
+
     def get_inertias(self):
         return self.inertias
 
     def set_inertias(self, values, indices):
         self.inertias = values
         self.written_indices = indices
+
+    def get_coms(self):
+        return self.coms
+
+    def set_coms(self, values, indices):
+        self.coms = values
+        self.coms_written_indices = indices
 
 
 class FakeAsset:
@@ -165,3 +180,58 @@ def test_default_estimate_is_the_shape_a_racing_quad_has(env):
     assert 1.6 < izz / ixx < 2.2
     # And it must be heavier to spin than the 0.5 kg aircraft it inherited from.
     assert ixx > 0.003
+
+
+# --- principal axes ---------------------------------------------------------
+
+
+def test_principal_axes_are_aligned_with_the_body_axes(env):
+    """PhysX stores principal moments plus a rotation, and the rotation lives
+    in the COM pose rather than the inertia tensor. Leave it and the tensor we
+    wrote is not the tensor the aircraft has: this asset's 7.16 degree tilt
+    about y turned (0.0040, 0.0055, 0.0075) into (0.004054, 0.0055, 0.007446)
+    with 4.32e-4 in the products."""
+    set_body_inertia(env, None, inertia_diag=(0.1, 0.2, 0.3))
+    quat = env._asset.root_physx_view.coms[0, BODY_ID, 3:7]
+    assert torch.allclose(quat, torch.tensor([0.0, 0.0, 0.0, 1.0]), atol=1e-7)
+
+
+def test_the_com_quaternion_is_xyzw_not_wxyz(env):
+    """The real part goes last. Writing wxyz identity here would store
+    (1, 0, 0, 0) = a 180 degree rotation about x, which maps a diagonal tensor
+    to itself and so passes every inertia check while being wrong. The only
+    thing that catches it is looking at the quaternion."""
+    set_body_inertia(env, None, inertia_diag=(0.1, 0.2, 0.3))
+    quat = env._asset.root_physx_view.coms[0, BODY_ID, 3:7]
+    assert float(quat[3]) == pytest.approx(1.0), "real part belongs in slot 3"
+    assert float(quat[0]) == pytest.approx(0.0)
+
+
+def test_the_com_offset_is_preserved(env):
+    """Only the rotation is ours to clear. Where the mass is centred is a
+    property of the airframe -- battery and Orin placement -- and zeroing it
+    would silently move the aircraft's balance point."""
+    view = env._asset.root_physx_view
+    view.coms[:, BODY_ID, :3] = torch.tensor([0.01, -0.02, 0.03])
+
+    set_body_inertia(env, None, inertia_diag=(0.1, 0.2, 0.3))
+
+    assert torch.allclose(
+        view.coms[0, BODY_ID, :3], torch.tensor([0.01, -0.02, 0.03]), atol=1e-7
+    )
+
+
+def test_other_bodies_keep_their_com_pose(env):
+    before = env._asset.root_physx_view.coms[:, 0].clone()
+    set_body_inertia(env, None, inertia_diag=(0.1, 0.2, 0.3))
+    assert torch.allclose(before, env._asset.root_physx_view.coms[:, 0])
+
+
+def test_only_named_envs_have_their_axes_cleared(env):
+    ids = torch.tensor([1, 4])
+    set_body_inertia(env, ids, inertia_diag=(0.1, 0.2, 0.3))
+    coms = env._asset.root_physx_view.coms[:, BODY_ID, 3:7]
+    for touched in (1, 4):
+        assert float(coms[touched][3]) == pytest.approx(1.0)
+    for untouched in (0, 2, 3, 5):
+        assert float(coms[untouched][3]) == pytest.approx(0.99805, abs=1e-5)
