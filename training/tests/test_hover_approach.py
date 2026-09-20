@@ -131,3 +131,36 @@ def test_does_not_outrank_settling():
     hold_max = STATION_W * float(hover.station_keep(_env(on_point), "target"))
     assert approach_max < hold_max
     assert approach_max < SETTLED_W
+
+
+def test_every_hover_reward_is_exported_from_the_package():
+    """The config reaches these as ``mdp.<name>``, and this list is written by
+    hand -- so a new reward function can exist, be tested, and still crash the
+    environment at import with ``module has no attribute``.
+
+    That is exactly what happened to ``approach``: the tests above load
+    ``rewards.py`` by file path to avoid needing a full Isaac install, which
+    means they never touch ``__init__.py`` and cannot see a missing export.
+    This test reads the export list as text, for the same reason.
+    """
+    import ast
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parent.parent / "tasks" / "drone_hover" / "mdp"
+
+    exported: set[str] = set()
+    for node in ast.parse((root / "__init__.py").read_text()).body:
+        if isinstance(node, ast.ImportFrom) and node.module == "rewards":
+            exported |= {a.name for a in node.names}
+
+    defined = {
+        node.name
+        for node in ast.parse((root / "rewards.py").read_text()).body
+        if isinstance(node, ast.FunctionDef) and not node.name.startswith("_")
+    }
+
+    missing = defined - exported
+    assert not missing, (
+        f"defined in rewards.py but not exported from mdp/__init__.py: "
+        f"{sorted(missing)} -- the env config will fail at import"
+    )

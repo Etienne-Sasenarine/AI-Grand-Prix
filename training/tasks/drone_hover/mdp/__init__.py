@@ -9,6 +9,7 @@ one; only the terms below are new.
 from tasks.drone_racer.mdp import *  # noqa: F401, F403
 
 from .rewards import (  # noqa: F401
+    approach,
     hold_point,
     settled,
     station_keep,
