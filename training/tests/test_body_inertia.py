@@ -14,30 +14,9 @@ import pytest
 import torch
 
 
-def _install_isaaclab_stubs():
-    """Minimal stand-ins so ``mdp.events`` imports without Isaac Sim."""
-    if "isaaclab" in sys.modules:
-        return
-    isaaclab = types.ModuleType("isaaclab")
-    assets = types.ModuleType("isaaclab.assets")
-    assets.Articulation = type("Articulation", (), {})
-    assets.RigidObject = type("RigidObject", (), {})
-    utils = types.ModuleType("isaaclab.utils")
-    math_mod = types.ModuleType("isaaclab.utils.math")
-    envs = types.ModuleType("isaaclab.envs")
-    envs.ManagerBasedEnv = type("ManagerBasedEnv", (), {})
-    utils.math = math_mod
-    isaaclab.assets, isaaclab.utils, isaaclab.envs = assets, utils, envs
-    sys.modules.update({
-        "isaaclab": isaaclab,
-        "isaaclab.assets": assets,
-        "isaaclab.utils": utils,
-        "isaaclab.utils.math": math_mod,
-        "isaaclab.envs": envs,
-    })
+from tests._isaaclab_stub import ensure
 
-
-_install_isaaclab_stubs()
+ensure()
 
 
 def _load_events_module():
