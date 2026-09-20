@@ -28,6 +28,9 @@ from dynamics.rate_control import (
     decode_aigp_action,
     plant_thrust_scale,
     quad_share_for_twr,
+    RATE_KP,
+    RATE_KD,
+    MOMENT_LIMIT,
     rate_moments,
     stick_to_newtons,
 )
@@ -362,11 +365,11 @@ class ControlActionCfg(ActionTermCfg):
     max_thrust: float = THRUST_MAX
     rate_limit: float = RATE_LIMIT
     """NED rate at action ±1, matching ``race_obs.ACTION_RANGES`` (±3.2 rad/s)."""
-    rate_kp: tuple[float, float, float] = (0.08, 0.08, 0.08)
+    rate_kp: tuple[float, float, float] = RATE_KP
     """PD P gains on FLU rate error, N·m / (rad/s). Yaw matches roll/pitch."""
-    rate_kd: tuple[float, float, float] = (0.003, 0.003, 0.003)
+    rate_kd: tuple[float, float, float] = RATE_KD
     """PD D gains on measured FLU rate, N·m / (rad/s)."""
-    moment_limit: tuple[float, float, float] = (0.30, 0.30, 0.20)
+    moment_limit: tuple[float, float, float] = MOMENT_LIMIT
     """Saturate body moments (N·m). Yaw is usable, not a leftover motor-mix leftover."""
     # Kept so old Hydra overrides (`use_motor_model=False`) still parse.
     use_motor_model: bool = False

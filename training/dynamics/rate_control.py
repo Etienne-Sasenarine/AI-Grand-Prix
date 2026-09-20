@@ -231,3 +231,106 @@ def rate_moments(
     err = omega_des_flu - omega_flu
     moment = kp * err - kd * omega_flu
     return moment.clamp(-moment_limit, moment_limit)
+
+
+# ---------------------------------------------------------------------------
+# Inner rate loop: gains derived from the inertia, not pinned beside it
+# ---------------------------------------------------------------------------
+#
+# ``rate_moments`` is a first-order loop -- moment = kp*err - kd*omega -- so
+# closing it around a rigid body gives
+#
+#     I * omega_dot + (kp + kd) * omega = kp * omega_des
+#
+# whose time constant is  tau = I / (kp + kd).  **The response scales with
+# inertia.**  Gains that are right for one airframe are wrong for a heavier-to-
+# spin one by exactly the inertia ratio.
+#
+# That is not hypothetical. The gains below were inherited from the 0.5 kg
+# upstream aircraft, whose inertia was (0.003, 0.003, 0.006), and stayed
+# untouched when this airframe's inertia was corrected to (0.004, 0.0055,
+# 0.0075). The pairing broke silently:
+#
+#     axis    tau before    tau after    change
+#     roll      36.1 ms      48.2 ms      +33%
+#     pitch     36.1 ms      66.3 ms      +84%
+#     yaw       72.3 ms      90.4 ms      +25%
+#
+# A policy commanding body rates through an 84%-slower pitch axis reaches gates
+# and cannot thread them, which is what the first corrected-plant run did.
+#
+# So the gains are *derived* here rather than written down next to the inertia
+# and trusted to stay in step. Change the inertia and the gains follow.
+INERTIA_DIAG = (0.0040, 0.0055, 0.0075)
+
+# Target closed-loop time constant per axis.
+#
+# These restore the response the gains were originally designed for, which is
+# the defensible choice: it removes a regression without inventing a number we
+# have not measured. Yaw is slower than roll and pitch on purpose -- that
+# asymmetry is real on a quad, where yaw authority comes from prop drag rather
+# than thrust differential.
+#
+# Two things bound this from below and are worth stating:
+#
+#   * Physics runs at 120 Hz (dt = 8.33 ms). A first-order loop needs tau
+#     comfortably above dt or the discretisation stops representing it; below
+#     roughly 2-3 dt it is numerically marginal. That puts a floor near 25 ms
+#     on anything this simulator can honestly claim.
+#   * A real Betaflight rate loop on a 5-inch quad settles far faster than
+#     this -- single-digit milliseconds. We cannot model that at 120 Hz, so the
+#     simulated aircraft is slower to respond than the real one, in a direction
+#     that makes the policy *more* conservative rather than less. Closing that
+#     gap properly needs a bench measurement: step a rate command with props
+#     off, log the gyro, fit the time constant. Until then this is a documented
+#     approximation, not a claim.
+RATE_TAU_TARGET_S = (0.036, 0.036, 0.072)
+
+# kd as a fraction of kp, preserved from the original tuning (0.003 / 0.08).
+# kd damps measured rate rather than error, so it trades overshoot against
+# steady-state tracking; keeping the ratio keeps that character while the
+# magnitudes follow the inertia.
+RATE_KD_KP_RATIO = 0.0375
+
+# Peak angular acceleration the original tuning allowed, rad/s^2, per axis:
+# the old moment limits (0.30, 0.30, 0.20) over the old inertia. Holding
+# *acceleration* fixed rather than torque is what keeps the aircraft feeling
+# the same when its inertia changes.
+RATE_ALPHA_MAX = (100.0, 100.0, 100.0 / 3.0)
+
+
+def rate_gains_for_inertia(
+    inertia_diag: tuple[float, float, float] = INERTIA_DIAG,
+    tau_s: tuple[float, float, float] = RATE_TAU_TARGET_S,
+    kd_kp_ratio: float = RATE_KD_KP_RATIO,
+) -> tuple[tuple[float, float, float], tuple[float, float, float]]:
+    """Per-axis ``(kp, kd)`` giving each axis its target time constant.
+
+    From ``tau = I / (kp + kd)`` and ``kd = ratio * kp``:
+
+        kp = I / (tau * (1 + ratio))
+        kd = ratio * kp
+    """
+    kp, kd = [], []
+    for inertia, tau in zip(inertia_diag, tau_s):
+        total = inertia / tau
+        k_p = total / (1.0 + kd_kp_ratio)
+        kp.append(k_p)
+        kd.append(kd_kp_ratio * k_p)
+    return tuple(kp), tuple(kd)
+
+
+def moment_limits_for_inertia(
+    inertia_diag: tuple[float, float, float] = INERTIA_DIAG,
+    alpha_max: tuple[float, float, float] = RATE_ALPHA_MAX,
+) -> tuple[float, float, float]:
+    """Torque ceiling giving each axis ``alpha_max`` angular acceleration.
+
+    Scaling the ceiling with inertia is the point: a fixed torque limit on a
+    heavier-to-spin airframe is a quietly weaker aircraft.
+    """
+    return tuple(i * a for i, a in zip(inertia_diag, alpha_max))
+
+
+RATE_KP, RATE_KD = rate_gains_for_inertia()
+MOMENT_LIMIT = moment_limits_for_inertia()
