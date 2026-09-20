@@ -535,6 +535,22 @@ class DroneRacerEnvCfg(ManagerBasedRLEnvCfg):
         self.observations.critic = None
         self.events.reset_base = None
         self.commands.target.randomise_start = True
+        # A quarter of episodes begin on the floor at the run-in, the rest
+        # arrive already moving.
+        #
+        # The race starts at G1 from a standstill. Training used the standing
+        # run-in only when the target was index 0, so the policy saw a standing
+        # start at one gate out of eleven -- and the best racing policy we have,
+        # averaging 9.5 gates, fails 100% of episodes at G1 from the real start
+        # position. It had never been there.
+        #
+        # A quarter rather than all of them: the other three quarters are what
+        # teach carrying speed between gates, which is the rest of the race.
+        self.commands.target.floor_start_fraction = 0.25
+        # 0.12 m is wheels-down without touching: the collision termination
+        # fires at 0.01 N, so an aircraft resting on the floor would end its
+        # episode before the policy acted. Up to 0.5 m covers a hand launch.
+        self.commands.target.spawn_z_range = (0.12, 0.50)
 
         # general settings
         # VADR-TS-001 3.2/4.4: physics runs at 120 Hz and the command rate must

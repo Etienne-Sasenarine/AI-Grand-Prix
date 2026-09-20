@@ -244,7 +244,26 @@ class GateTargetingCommand(CommandTerm):
                     [-(self.cfg.start_run_in_m + 1.0), 0.0, 0.0], device=self.device
                 ).expand(self.num_envs, 3),
             )
-            if self.cfg.start_at_run_in or not self.cfg.randomise_start:
+            if self.cfg.floor_start_fraction > 0.0:
+                # A mixture, not a switch.
+                #
+                # Training used the stationary run-in only when the target was
+                # index 0, so the policy met that geometry at exactly one gate
+                # out of eleven. Play forces it at whatever gate you start
+                # from, and the real race starts at G1 -- which is how a policy
+                # averaging 9.5 gates came to fail 100% of episodes at the
+                # first gate, having never once seen a standing start there.
+                #
+                # Making every episode a standing start would fix that and
+                # break something else: the policy would stop practising the
+                # continuous, already-moving course flying that the other ten
+                # gates need. So a fraction start from rest and the rest carry
+                # speed through, and both stay in distribution.
+                at_run_in = (
+                    torch.rand(self.num_envs, 1, device=self.device)
+                    < self.cfg.floor_start_fraction
+                )
+            elif self.cfg.start_at_run_in or not self.cfg.randomise_start:
                 # Every episode begins in front of its target gate.
                 at_run_in = torch.ones(self.num_envs, 1, dtype=torch.bool, device=self.device)
             else:
@@ -298,8 +317,14 @@ class GateTargetingCommand(CommandTerm):
             if self.cfg.spawn_z_range is not None:
                 lo, hi = self.cfg.spawn_z_range
                 gate_positions = gate_positions.clone()
-                gate_positions[:, 2] = (
-                    torch.rand(self.num_envs, device=self.device) * (hi - lo) + lo
+                sampled = torch.rand(self.num_envs, device=self.device) * (hi - lo) + lo
+                # Only the standing starts go to the floor. An env that is
+                # meant to arrive already moving keeps the height its previous
+                # gate implies -- dropping it to the floor as well would erase
+                # the in-motion start this mixture exists to preserve.
+                on_floor = at_run_in.squeeze(-1)
+                gate_positions[:, 2] = torch.where(
+                    on_floor, sampled, gate_positions[:, 2]
                 )
 
             spawn_pos = gate_positions + math_utils.quat_apply(
@@ -538,6 +563,24 @@ class GateTargetingCommandCfg(CommandTermCfg):
 
     start_run_in_m: float = 3.0
     """Metres behind the first gate (along ``-n̂``) when an episode starts on gate 1."""
+
+    floor_start_fraction: float = 0.0
+    """Fraction of episodes that begin stationary at the run-in, not in motion.
+
+    Zero keeps the original behaviour: the standing run-in happens only when
+    the target is gate index 0, and every other episode spawns a metre past the
+    previous gate already carrying speed.
+
+    That is how a policy averaging 9.5 gates came to fail *every* episode at
+    the first gate. The race starts at G1 from a standstill, and training had
+    shown it a standstill at exactly one gate out of eleven.
+
+    Set with ``spawn_z_range`` to make those episodes start on the floor, so
+    the aircraft has to take off, climb and fly the gate -- which is what a
+    real run is. Keep it below 1.0: the episodes that are *not* standing starts
+    are what teach continuous course flying, and a policy trained only on
+    standing starts forgets how to carry speed between gates.
+    """
 
     spawn_z_range: tuple[float, float] | None = None
     """Uniform range to sample the spawn height from, overriding the nominal one.

@@ -164,3 +164,47 @@ def test_every_hover_reward_is_exported_from_the_package():
         f"defined in rewards.py but not exported from mdp/__init__.py: "
         f"{sorted(missing)} -- the env config will fail at import"
     )
+
+
+def test_floor_start_fraction_is_a_mixture_not_a_switch():
+    """Racing must keep practising in-motion starts.
+
+    The race begins at G1 from a standstill, which training had shown the
+    policy at exactly one gate in eleven -- hence a 9.5-gate policy failing
+    every episode at the real start. The fix is to add standing starts, not to
+    replace the moving ones: a policy trained only from rest stops learning to
+    carry speed between gates, which is the other ten elevenths of the race.
+    """
+    import ast
+    from pathlib import Path
+
+    src = (Path(__file__).resolve().parent.parent / "tasks" / "drone_racer"
+           / "drone_racer_env_cfg.py").read_text()
+    frac = None
+    for node in ast.walk(ast.parse(src)):
+        if (isinstance(node, ast.Assign)
+                and isinstance(node.targets[0], ast.Attribute)
+                and node.targets[0].attr == "floor_start_fraction"):
+            frac = ast.literal_eval(node.value)
+    assert frac is not None, "racing never sets floor_start_fraction"
+    assert 0.0 < frac < 1.0, f"{frac} must be a mixture, not all-or-nothing"
+
+
+def test_racing_floor_spawn_clears_the_ground():
+    """The collision termination fires at 0.01 N, so a spawn resting on the
+    floor ends its episode before the policy has acted -- the same trap the
+    hover task had to avoid."""
+    import ast
+    from pathlib import Path
+
+    src = (Path(__file__).resolve().parent.parent / "tasks" / "drone_racer"
+           / "drone_racer_env_cfg.py").read_text()
+    rng = None
+    for node in ast.walk(ast.parse(src)):
+        if (isinstance(node, ast.Assign)
+                and isinstance(node.targets[0], ast.Attribute)
+                and node.targets[0].attr == "spawn_z_range"):
+            rng = ast.literal_eval(node.value)
+    assert rng is not None
+    assert rng[0] > 0.05, f"floor of {rng[0]} m is too close to the ground"
+    assert rng[0] < rng[1]
