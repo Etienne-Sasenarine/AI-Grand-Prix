@@ -39,7 +39,12 @@ def _isaac_available() -> bool:
 
 ISAAC = _isaac_available()
 
-collect_ignore = [] if ISAAC else list(_NEEDS_ISAAC)
+# scripts/smoke_test.py matches pytest's *_test.py pattern but is a runnable
+# program, not a test module -- it needs a live Isaac app and takes arguments.
+# Collecting it breaks the whole run on any machine without Isaac.
+collect_ignore = ["scripts/smoke_test.py"]
+if not ISAAC:
+    collect_ignore += list(_NEEDS_ISAAC)
 
 
 def pytest_configure(config):
