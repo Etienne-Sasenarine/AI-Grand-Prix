@@ -4,9 +4,11 @@ The reproducible path, written from the attempt that actually got Isaac Sim
 running. [`RUNPOD_SETUP.md`](RUNPOD_SETUP.md) is the catalogue of everything
 that went wrong and why; this is just the sequence that works.
 
-**Verified up to and including the repo transfer.** The smoke test and training
-steps at the end are written but had not yet been executed when this was
-recorded — they are marked.
+**Verified end to end.** Both tasks pass 15 of 15 smoke checks on an RTX 6000
+Ada, and training launches from the same box. What the first real smoke run
+found, and what each failure turned out to be, is in
+[`FINDINGS_2026-09-20_resolved.md`](FINDINGS_2026-09-20_resolved.md) — two of
+the four were not what they looked like.
 
 ---
 
@@ -173,7 +175,7 @@ and anything about NGX — that is DLSS, which headless training does not use.
 `IOMMU is enabled` is also a warning, not the cause of a crash; the file
 descriptor limit is.
 
-## 6. Install skrl — *not yet verified*
+## 6. Install skrl
 
 Isaac Sim 4.5 and Isaac Lab 2.1 are already in the image. Only skrl is missing,
 and it must be **1.4.2** — Isaac Lab 2.1 uses the 1.x runner API, and 2.x fails
@@ -186,23 +188,55 @@ cd /workspace/aigp-sim && ./..../isaaclab.sh -p -m pip install -e . --no-deps
 python -c "import tasks"     # must succeed; pip's exit code is not enough
 ```
 
-## 7. Smoke test, then train — *not yet verified*
+## 7. Smoke test, then train
+
+Use the launcher rather than calling `train.py` directly. It runs the smoke
+test as a gate, refuses to continue unless it passes, and sets the three
+environment things whose absence looks like a crash:
 
 ```bash
 cd /workspace/aigp-sim
-# the gate: mass, inertia, plant randomisation, latency, observation width
-./isaaclab.sh -p scripts/smoke_test.py --headless    # must exit 0
-
-# hover first — it seeds racing and is the cage-test artifact
-./isaaclab.sh -p scripts/rl/train.py --task Isaac-Drone-Hover-v0 --headless --num_envs 4096
-# then racing, warm-started from it
-./isaaclab.sh -p scripts/rl/train.py --task Isaac-Drone-Racer-v0 --headless --num_envs 4096
+bash scripts/pod/train_launch.sh Isaac-Drone-Hover-v0 hover01 --max_iterations 300
 ```
 
-Run training inside `tmux` and sync checkpoints off the pod as they are written.
-A pod with **no network volume is terminated** when the balance hits zero and
-its data is unrecoverable, so a checkpoint that exists only on the pod is a
-checkpoint you can lose entirely.
+Hover first: it is the cage-test artifact and the racing seed. **Stop it well
+short of convergence** — a converged station keeper has learned to damp all
+motion, which is the opposite of racing. Then racing, warm-started from it:
+
+```bash
+bash scripts/pod/train_launch.sh Isaac-Drone-Racer-v0 race01 \
+    --checkpoint /workspace/logs/skrl/drone_racer/<hover-run>/checkpoints/best_agent.pt
+```
+
+The policy weights transfer; the value head does not, being task-specific.
+
+### Do not trust the exit code — of anything here
+
+Two independent mechanisms throw it away, and they compound:
+
+* `isaaclab.sh` swallows the exit code of the script it runs.
+* `SimulationApp.close()` hard-exits, so `sys.exit(status)` never runs **and**
+  Python's buffered stdout is discarded. A run that completed can leave a log
+  containing only C++ warnings and a clean `0`, which is indistinguishable
+  from the §8 startup segfault.
+
+`smoke_test.py` therefore prints `SMOKE_RESULT=PASS|FAIL` on stdout, flushed.
+Grep that. The launcher does, and treats a *missing* verdict as failure —
+because a missing verdict means it died before finishing.
+
+### Pull checkpoints off the pod, continuously
+
+From your own machine, not the pod — the pod is behind NAT and cannot reach
+you:
+
+```bash
+export POD_HOST=<ip> POD_PORT=<port> POD_KEY=~/.ssh/runpod_aigp
+bash scripts/pod/pull_checkpoints.sh          # every 15 min until stopped
+```
+
+A pod with **no network volume is deleted** when the balance hits zero, and
+the disk goes with it. There is no snapshot and no recovery. A checkpoint that
+exists only on the pod is a checkpoint you can lose entirely.
 
 ---
 

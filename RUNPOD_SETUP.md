@@ -373,3 +373,14 @@ bash -c 'ulimit -n 65535; apt-get update -qq && apt-get install -y -qq openssh-s
 
 Raises the fd limit, installs sshd *and tmux* (so long jobs can be detached),
 plants RunPod's injected key, starts the daemon, and holds the container open.
+
+---
+
+## Quick reference, updated
+
+| Symptom | Cause |
+|---|---|
+| Dies ~7s in, no traceback, `RC=0` | fd limit — **or** a stale tmux server capping it (§8) |
+| Log has only C++ warnings, then nothing | Isaac hard-exit discarded the stdout buffer (§9) |
+| Script "passed" but nothing was checked | `$?` is meaningless here; grep the printed verdict (§9) |
+| `ulimit -n 65535` in the script had no effect | tmux server was started from a 1024-fd shell (§8) |
