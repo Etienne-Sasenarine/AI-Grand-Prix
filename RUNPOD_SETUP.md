@@ -282,3 +282,44 @@ the container alive once sshd has daemonised.
 
 **General lesson:** on this platform, anything that must outlive a shell
 belongs in the start command, not in a command you run afterwards.
+
+---
+
+## 8. Raise the file-descriptor limit, or Isaac Sim may die on startup
+
+The container's soft `ulimit -n` is **1024**. Omniverse opens thousands of file
+descriptors while loading its extension set, and a low limit is a documented
+cause of crashes during `SimulationApp.__init__` — which is exactly where ours
+segfaulted.
+
+The hard limit is **524288**, so raising the soft limit works:
+
+```bash
+ulimit -n 65535
+```
+
+Do it in the container start command so PID 1 owns it and every child — sshd,
+and therefore every SSH session and training run — inherits it.
+
+Worth checking alongside it, since both are cheap and both are classic container
+causes of the same symptom:
+
+```bash
+df -h /dev/shm      # ours was 88G, fine; a 64M default would be a problem
+ulimit -n           # ours was 1024, too low
+```
+
+Not confirmed as the fix. The retry with the limit raised was killed
+mid-startup before it could finish (see §7 — no tmux in the image either), so
+this remains untested. It is, however, a better-supported hypothesis than the
+IOMMU warning in §0: it explains a crash at extension-load time specifically,
+where IOMMU would more likely cause instability later or not at all.
+
+## The start command that folds in everything learned
+
+```
+bash -c 'ulimit -n 65535; apt-get update -qq && apt-get install -y -qq openssh-server tmux && mkdir -p ~/.ssh && echo "$PUBLIC_KEY" >> ~/.ssh/authorized_keys && chmod 700 ~/.ssh && chmod 600 ~/.ssh/authorized_keys && ssh-keygen -A && mkdir -p /run/sshd && /usr/sbin/sshd && sleep infinity'
+```
+
+Raises the fd limit, installs sshd *and tmux* (so long jobs can be detached),
+plants RunPod's injected key, starts the daemon, and holds the container open.
