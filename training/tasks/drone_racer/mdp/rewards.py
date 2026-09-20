@@ -373,3 +373,48 @@ def ang_vel_l2(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg = SceneEntityCf
     # extract the used quantities (to enable type-hinting)
     asset: RigidObject = env.scene[asset_cfg.name]
     return torch.sum(torch.square(asset.data.root_ang_vel_b), dim=1)
+
+
+# The qualifier is scored on completing two laps, not on lap time -- and at the
+# time of writing exactly one team has managed two full laps. So speed is not
+# the objective; it is a cost paid in precision.
+#
+# Measured on the first racing policy trained against the corrected plant: it
+# flew at 14.0 m/s median and 21.3 m/s at p95, and 73% of its crashes were gate
+# strikes at that speed, one metre from the gate centre. Two laps of this
+# 106.2 m course inside the 40 s episode needs 5.3 m/s average. The policy was
+# flying roughly three times faster than the task requires and spending the
+# difference on hitting gate frames.
+#
+# Slowing down helps three ways at once, and the third is the one that is easy
+# to miss: the modelled vision delay of 1-4 control steps is 0.24-0.94 m of
+# stale keypoints at 14 m/s, and half that at 7. Latency hurts in metres, not
+# milliseconds, so halving speed halves the effective sensor staleness.
+DEFAULT_SPEED_CAP_MPS = 8.0
+
+
+def over_speed(
+    env: ManagerBasedRLEnv,
+    cap_mps: float = DEFAULT_SPEED_CAP_MPS,
+    asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
+) -> torch.Tensor:
+    """Squared excess speed above ``cap_mps``, zero below it.
+
+    Squared rather than linear so the penalty is gentle at the cap and steep
+    well beyond it: a policy drifting to 9 m/s is barely discouraged, one
+    charging at 20 m/s is strongly so. A linear penalty would tax the useful
+    range as hard as the dangerous one.
+
+    Deliberately *not* the post-policy ``utils.speed_cap`` limiter. That brakes
+    after the policy has already committed, which trains a policy that fights
+    its own limiter and oscillates at the boundary. This makes the speed part
+    of what the policy is optimising, so it learns to fly at a pace it can
+    actually hold a line at.
+
+    Cap the *whole* velocity rather than the forward component: a 15 m/s
+    sideways drift through a gate opening is no more survivable than a 15 m/s
+    charge at its frame.
+    """
+    asset: RigidObject = env.scene[asset_cfg.name]
+    speed = torch.norm(asset.data.root_lin_vel_w, dim=-1)
+    return torch.square((speed - cap_mps).clamp(min=0.0))

@@ -438,7 +438,18 @@ class RewardsCfg:
     # Kaufmann / Nature 2023 velocity-to-gate. Dense is direction only.
     # 0.12: a 40 s aligned episode is +288, still under one pass (600).
     vel_align_gate = RewTerm(func=mdp.vel_align_gate, weight=0.12, params={"command_name": "target"})
-    vel_gate_passage = RewTerm(func=mdp.vel_gate_passage, weight=3.4, params={"command_name": "target"})
+    # Zeroed for the completion-scored objective. This term pays directly for
+    # speed through the opening, which is the behaviour that was producing gate
+    # strikes at 14 m/s. ``center_gate_passage`` still pays for going through
+    # cleanly, so the shaping that matters survives.
+    vel_gate_passage = RewTerm(func=mdp.vel_gate_passage, weight=0.0, params={"command_name": "target"})
+    # Speed above what two laps actually need, squared. At the 8 m/s cap two
+    # laps of the 106 m course take 27 s of the 40 s episode -- comfortable
+    # margin -- while the policy that trained without this flew at 14 m/s.
+    over_speed = RewTerm(
+        func=mdp.over_speed, weight=-0.5,
+        params={"cap_mps": mdp.DEFAULT_SPEED_CAP_MPS},
+    )
     # Smaller sibling at the crossing: FPV yaw within ψ of the gate normal.
     # 1 on-axis → +4; 0 at 40° (and beyond). Does not beat a 5 m/s vel bonus.
     cam_gate_passage = RewTerm(
