@@ -4,8 +4,8 @@ Two ways to use it:
 
 1. As a library from the flight-control code:
 
-       from inference.inference import GateDetector
-       det = GateDetector()                     # loads inference/best.pt once, warms up
+       from inference import GateDetector
+       det = GateDetector("best.pt")            # loads once, warms up
        gates = det.detect(frame_bgr)            # list[Gate], sorted best-first
        if gates:
            x, y = gates[0].aim_point            # pixel to steer towards
@@ -13,10 +13,10 @@ Two ways to use it:
 
 2. From the command line:
 
-       python inference/inference.py --source frames/train --show
-       python inference/inference.py --source flight.mp4 --save out.mp4
-       python inference/inference.py --source 0 --show                      # webcam
-       python inference/inference.py --source img.jpg --json gates.jsonl    # machine-readable output
+       python inference.py --source frames/train --show
+       python inference.py --source flight.mp4 --save out.mp4
+       python inference.py --source 0 --show                      # webcam
+       python inference.py --source img.jpg --json gates.jsonl    # machine-readable output
 
 Keypoint order (fixed by the dataset):
     0 out_UL, 1 out_UR, 2 out_BR, 3 out_BL, 4 in_UL, 5 in_UR, 6 in_BR, 7 in_BL
@@ -108,7 +108,7 @@ class Gate:
 class GateDetector:
     """Thin wrapper around the YOLO pose model that returns Gate objects."""
 
-    def __init__(self, weights: str | Path = Path(__file__).parent / "best.pt", imgsz: int = 640, conf: float = 0.4,
+    def __init__(self, weights: str | Path = "best.pt", imgsz: int = 640, conf: float = 0.4,
                  iou: float = 0.5, device: Optional[str] = None, half: bool = False, warmup: bool = True):
         self.model = YOLO(str(weights))
         if self.model.task != "pose":
@@ -244,7 +244,7 @@ def source_fps(source: str) -> float:
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--weights", default=str(Path(__file__).parent / "best.pt"))
+    ap.add_argument("--weights", default="best.pt")
     ap.add_argument("--source", required=True, help="image, folder, video, or webcam index")
     ap.add_argument("--imgsz", type=int, default=640)
     ap.add_argument("--conf", type=float, default=0.4, help="box confidence threshold")
