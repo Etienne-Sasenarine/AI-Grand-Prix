@@ -244,10 +244,11 @@ class GateTargetingCommand(CommandTerm):
                     [-(self.cfg.start_run_in_m + 1.0), 0.0, 0.0], device=self.device
                 ).expand(self.num_envs, 3),
             )
-            if self.cfg.randomise_start:
-                at_run_in = (self.next_gate_idx == 0).unsqueeze(-1)
-            else:
+            if self.cfg.start_at_run_in or not self.cfg.randomise_start:
+                # Every episode begins in front of its target gate.
                 at_run_in = torch.ones(self.num_envs, 1, dtype=torch.bool, device=self.device)
+            else:
+                at_run_in = (self.next_gate_idx == 0).unsqueeze(-1)
             gate_positions = torch.where(at_run_in, target_pos + back, gate_positions)
             gate_orientations = torch.where(at_run_in, target_quat, gate_orientations)
 
@@ -492,6 +493,26 @@ class GateTargetingCommandCfg(CommandTermCfg):
 
     start_run_in_m: float = 3.0
     """Metres behind the first gate (along ``-n̂``) when an episode starts on gate 1."""
+
+    start_at_run_in: bool = False
+    """Start every episode in front of the target gate, not after the previous one.
+
+    Racing wants the default: the drone appears one metre past the gate it has
+    just passed, which is where it would really be mid-course, and only an
+    episode beginning on gate 1 gets the run-in.
+
+    Station keeping wants the opposite, and needs it decoupled from
+    ``randomise_start``. Its reward is a Gaussian on distance to a hold point
+    two metres in front of the gate; spawning after the *previous* gate puts
+    the aircraft a full gate-spacing away, where that Gaussian returns zero and
+    there is no gradient to follow. Measured on the 11-gate course: 40 of 64
+    envs started beyond the task's own 8 m ``flyaway`` radius and terminated on
+    step one, at zero speed.
+
+    Set alongside ``start_run_in_m`` to place the spawn exactly on the hold
+    point. Scatter still applies -- this flag chooses *where* the episode
+    begins, not whether the start is jittered.
+    """
 
     reset_pos_xy_m: float = 1.0
     """Train spawn scatter in world x/y (m). Play forces 0."""

@@ -124,6 +124,25 @@ class DroneHoverEnvCfg(DroneRacerEnvCfg):
         # the plant randomisation actually gets sampled.
         self.episode_length_s = 15.0
 
+        # Start on the hold point, not after the previous gate.
+        #
+        # Inheriting the racing spawn looked like the conservative choice --
+        # same initial-state distribution, so the policy transfers -- and was
+        # wrong in a way that only running it showed. Racing puts the aircraft
+        # one metre past the gate it just passed, a full gate-spacing from the
+        # gate it is now targeting. ``station_keep`` is a Gaussian with a 0.75 m
+        # width, which at that range returns zero: no gradient, nothing to
+        # learn from. ``flyaway`` at 8 m then ended those episodes on step one,
+        # 40 of 64 of them, before the policy had acted at all.
+        #
+        # Both the reward and the termination radius are right for a station
+        # keeper. The spawn was the thing that did not belong, so it is the
+        # thing that changes. Gate choice stays random and the jitter stays on:
+        # the aircraft still sees every gate, and still has to correct a small
+        # offset rather than starting perfect.
+        self.commands.target.start_at_run_in = True
+        self.commands.target.start_run_in_m = STANDOFF_M
+
 
 @configclass
 class DroneHoverEnvCfg_PLAY(DroneRacerEnvCfg_PLAY):
