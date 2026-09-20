@@ -80,6 +80,8 @@ class ControlAction(ActionTerm):
 
         self._elapsed_time = torch.zeros(self.num_envs, 1, device=self.device)
         self._raw_actions = torch.zeros(self.num_envs, 4, device=self.device)
+        # The policy's own output, kept undelayed for the observation.
+        self._issued_actions = torch.zeros(self.num_envs, 4, device=self.device)
         self._processed_actions = torch.zeros(self.num_envs, 4, device=self.device)
         self._thrust = torch.zeros(self.num_envs, 1, 3, device=self.device)
         self._moment = torch.zeros(self.num_envs, 1, 3, device=self.device)
@@ -162,7 +164,21 @@ class ControlAction(ActionTerm):
         read = (self._queue_head - self._action_delay) % self._action_queue.shape[1]
         return self._action_queue[self._env_rows, read]
 
+    @property
+    def issued_actions(self) -> torch.Tensor:
+        """What the policy last emitted, before any delay was applied.
+
+        This, not ``raw_actions``, is what belongs in the observation. The
+        aircraft knows what it sent the moment it sends it; whether that command
+        has reached the flight controller yet is precisely what it cannot
+        observe. Feeding back the delayed command would hand the policy the
+        delay as free information and undo the point of modelling it.
+        """
+        return self._issued_actions
+
     def process_actions(self, actions: torch.Tensor):
+        # Keep the policy's own output before the delay line touches it.
+        self._issued_actions[:] = actions
         # What the policy just asked for is not what the aircraft is doing yet.
         # ``_raw_actions`` deliberately holds the *delayed* command, because it
         # is what the rest of the term and the reward read as "the action".
@@ -237,6 +253,7 @@ class ControlAction(ActionTerm):
             env_ids = self._robot._ALL_INDICES
 
         self._raw_actions[env_ids] = 0.0
+        self._issued_actions[env_ids] = 0.0
         self._processed_actions[env_ids] = 0.0
         self._cmd_rates_ned[env_ids] = 0.0
         self._cmd_thrust_n[env_ids] = 0.0

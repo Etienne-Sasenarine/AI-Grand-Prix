@@ -52,6 +52,8 @@ CAMERA_TILT_UP_DEG = 20.0
 GATE_OUTER_M = 2.7
 GATE_INNER_M = 1.5
 KEYPOINT_COUNT = 8
+# Policy action channels: thrust, roll rate, pitch rate, yaw rate.
+ACTION_DIM = 4
 NOT_SEEN = -1.0
 OFF_FRAME_MARGIN = 0.15
 GYRO_CLIP = 8.0
@@ -400,6 +402,110 @@ def specific_thrust(thrust: torch.Tensor, hover_trim: torch.Tensor | float) -> t
     return (thrust / trim) * G
 
 
+class KeypointDelayLine:
+    """Hand the policy the gate it saw a few control steps ago.
+
+    ``CameraFrameLatch`` models when a frame is *captured*. This models when the
+    result of that frame becomes *available*, which is a separate and larger
+    quantity: sensor readout, the copy to the Orin, YOLO-pose inference, and the
+    keypoints finally reaching the observation. None of it is instantaneous, and
+    the simulator previously assumed all of it was.
+
+    Applied after the latch, not before. The camera samples the world at its own
+    rate and *then* the pipeline takes time to deliver the sample, so the delay
+    acts on the held frame. Delaying first and latching afterwards -- which the
+    evaluation harness does -- samples an already-shifted signal and lands on
+    different frames whenever the delay is an odd number of control steps.
+
+    The delay is per environment. A single global value is something a policy
+    can learn exactly and quietly depend on; the real number moves with scene
+    complexity, how many gates are in view, and whatever else the Orin is doing.
+
+    On reset the buffer is backfilled with the current frame rather than zeroed.
+    A fresh episode has no older frame to show, and handing it blank keypoints
+    would teach the policy that every episode begins blind -- an artefact of the
+    simulator, not of the aircraft, which has been sitting there looking at the
+    same gate.
+    """
+
+    def __init__(
+        self,
+        num_envs: int,
+        device: torch.device | str,
+        *,
+        max_delay: int,
+        num_keypoints: int = KEYPOINT_COUNT,
+        dtype: torch.dtype = torch.float32,
+    ) -> None:
+        if max_delay < 0:
+            raise ValueError(f"max_delay must be non-negative, got {max_delay}")
+        self.num_envs = int(num_envs)
+        self.device = device
+        self.dtype = dtype
+        self.max_delay = int(max_delay)
+        depth = self.max_delay + 1
+        self.uv = torch.zeros(self.num_envs, depth, num_keypoints, 2, device=device, dtype=dtype)
+        self.visible = torch.zeros(
+            self.num_envs, depth, num_keypoints, device=device, dtype=torch.bool
+        )
+        self.delay = torch.zeros(self.num_envs, device=device, dtype=torch.long)
+        self._head = 0
+        self._rows = torch.arange(self.num_envs, device=device)
+        # Environments whose history must be refilled with the next frame they
+        # see. Deferred rather than done eagerly because the backfill needs the
+        # current projection, which the caller has not computed yet when it
+        # learns an episode has reset.
+        self._pending_reset: Optional[torch.Tensor] = None
+
+    def resample(self, env_ids: torch.Tensor, lo: int, hi: int) -> None:
+        """Draw a fresh delay for these environments, in control steps."""
+        if not len(env_ids):
+            return
+        self.delay[env_ids] = torch.randint(
+            int(lo), int(hi) + 1, (len(env_ids),), device=self.device
+        )
+
+    def reset(self, env_ids: Optional[torch.Tensor] = None) -> None:
+        """Mark these environments for a backfill on the next :meth:`step`.
+
+        The history is filled with the frame the aircraft can actually see at
+        that moment, not with zeros. A fresh episode has no older frame to
+        offer, and blank keypoints would teach the policy that every episode
+        opens blind -- an artefact of the simulator rather than of the aircraft,
+        which has been sitting on the pad looking at the same gate.
+        """
+        if env_ids is None:
+            env_ids = self._rows
+        if not len(env_ids):
+            return
+        if self._pending_reset is None:
+            self._pending_reset = env_ids
+        else:
+            self._pending_reset = torch.unique(torch.cat([self._pending_reset, env_ids]))
+
+    def step(
+        self, uv_px: torch.Tensor, visible: torch.Tensor
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """Record this step's frame and return the one each env is due.
+
+        A delay of zero returns exactly what was passed in, so switching the
+        delay off costs nothing and reproduces the old behaviour bit for bit.
+        """
+        if self._pending_reset is not None:
+            ids = self._pending_reset
+            self.uv[ids] = uv_px[ids].unsqueeze(1).to(self.dtype)
+            self.visible[ids] = visible[ids].unsqueeze(1)
+            self._pending_reset = None
+        if self.max_delay == 0:
+            return uv_px, visible
+        depth = self.uv.shape[1]
+        self._head = (self._head + 1) % depth
+        self.uv[:, self._head] = uv_px.to(self.dtype)
+        self.visible[:, self._head] = visible
+        read = (self._head - self.delay) % depth
+        return self.uv[self._rows, read], self.visible[self._rows, read]
+
+
 class CommandedBodyVelocity:
     """Batched FRD body-velocity integrator (AI_GP ``BodyVelocityIntegrator``).
 
@@ -577,10 +683,17 @@ def pack_observation(
     gate_index: Optional[torch.Tensor] = None,
     with_velocity: bool = False,
     with_context: bool = False,
+    actions: Optional[torch.Tensor] = None,
     frame_w: float = FRAME_W,
     frame_h: float = FRAME_H,
 ) -> torch.Tensor:
-    """Assemble the AI_GP observation vector. Shape (N, feature_dim)."""
+    """Assemble the AI_GP observation vector. Shape (N, feature_dim).
+
+    ``actions`` appends the four raw policy channels to the end of the frame,
+    making it observation ``v2`` (55 wide) instead of ``v1`` (51). They go last
+    so v2 is a strict append and the first 51 channels still mean exactly what
+    a v1 reader expects.
+    """
     n = uv_px.shape[0]
     device = uv_px.device
     dtype = torch.float32
@@ -605,6 +718,12 @@ def pack_observation(
         if gate_index is None:
             gate_index = torch.zeros(n, device=device, dtype=torch.long)
         parts.append(context_features(gate_index))
+    if actions is not None:
+        # What the policy *issued*, not what the plant received. The aircraft
+        # knows what it sent the instant it sends it; whether that command has
+        # landed yet is exactly the thing it cannot observe, and handing it over
+        # would put the delay back in the policy's hands as free information.
+        parts.append(actions[:, :ACTION_DIM].clamp(-1.0, 1.0).to(dtype))
     obs = torch.cat(parts, dim=-1)
     # Last line of defence. clamp() passes NaN through unchanged, so a single
     # non-finite pixel would otherwise reach the network, and one NaN gradient
@@ -625,6 +744,8 @@ def build_aigp_observation(
     with_velocity: bool = False,
     with_context: bool = True,
     camera_latch: Optional["CameraFrameLatch"] = None,
+    keypoint_delay: Optional["KeypointDelayLine"] = None,
+    actions: Optional[torch.Tensor] = None,
     dt: float = 0.0,
 ) -> torch.Tensor:
     """Full AI_GP observation from Isaac scene state. Shape (N, D).
@@ -635,6 +756,17 @@ def build_aigp_observation(
     Pass ``camera_latch`` (with ``dt`` set to the control step) to rate-limit the
     keypoints to the 30 Hz vision stream. Without it they refresh every control
     step, which is faster than any real camera.
+
+    Pass ``keypoint_delay`` to additionally hold the result for the time the
+    perception pipeline takes to produce it. Order matters and is not
+    interchangeable: the camera samples the world at its own rate, and only
+    then does inference take time to deliver that sample, so the delay is
+    applied to the *latched* frame.
+
+    Pass ``actions`` -- the four raw channels the policy last emitted, in
+    ``[-1, 1]`` -- to append them to the frame. That is observation ``v2``,
+    and it is what lets a policy account for a command it has issued but not
+    yet seen take effect. Omit it for ``v1``.
     """
     kps_w = align_keypoints_to_view(
         gate_keypoints_world(gate_pos_w, gate_quat_w),
@@ -645,6 +777,8 @@ def build_aigp_observation(
     uv, visible = project_points_aigp_camera(kps_w, drone_pos_w, drone_quat_w)
     if camera_latch is not None:
         uv, visible = camera_latch.step(dt, uv, visible)
+    if keypoint_delay is not None:
+        uv, visible = keypoint_delay.step(uv, visible)
     roll, pitch = attitude_roll_pitch_ned(drone_quat_w)
     gyro_ned = flu_to_ned(drone_ang_vel_b_flu)
     return pack_observation(
@@ -657,4 +791,5 @@ def build_aigp_observation(
         gate_index=gate_index,
         with_velocity=with_velocity,
         with_context=with_context,
+        actions=actions,
     )

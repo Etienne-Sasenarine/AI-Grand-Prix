@@ -196,6 +196,14 @@ class ActionsCfg:
     control_action: mdp.ControlActionCfg = mdp.ControlActionCfg(use_motor_model=False)
 
 
+# Observation contract version. v1 is the 51-channel frame every checkpoint
+# through pq_speed_best trained against; v2 appends the four action channels,
+# making the frame 55 wide and the flattened vector 1760. Changing this
+# invalidates checkpoints, which is why it is an explicit switch rather than a
+# silent default.
+_OBS_VERSION = os.environ.get("OBS_VERSION", "v2").strip().lower()
+
+
 @configclass
 class ObservationsCfg:
     """Observation specifications for the MDP."""
@@ -221,6 +229,23 @@ class ObservationsCfg:
                 # vector (attitude, body rates, commanded velocity) is IMU and
                 # controller data and keeps updating every control step.
                 "camera_rate_hz": 30.0,
+                # How long after the shutter the keypoints actually exist:
+                # sensor readout, the copy to the Orin, YOLO-pose inference.
+                # In 60 Hz control steps, so 1-4 is 17-67 ms. One camera frame
+                # period alone is 33 ms before inference has run at all.
+                #
+                # Set OBS_VERSION=v1 to switch this and the action channels off
+                # together and get the exact 1632-d vector back.
+                "vision_delay_steps_range": (
+                    None if _OBS_VERSION == "v1" else (1, 4)
+                ),
+                # Observation v2. Without this the policy has no record of what
+                # it commanded, so it cannot account for a command that has been
+                # issued but not yet landed -- and every delay above becomes an
+                # unexplainable disturbance rather than something to compensate
+                # for. Eschmann's ablation: 10/10 to 0/10 with delay simulated
+                # and action history removed.
+                "with_actions": _OBS_VERSION != "v1",
             },
             # Stacked observations, as in AI_GP race_obs (DEFAULT_HISTORY). A
             # single frame cannot tell a gate drifting out of view from one

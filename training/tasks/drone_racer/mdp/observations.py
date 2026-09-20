@@ -183,6 +183,8 @@ def aigp_race_observation(
     mass_kg: float = DEFAULT_MASS_KG,
     drag_body: tuple[float, float, float] = (-0.50, -0.50, -0.15),
     camera_rate_hz: float = 30.0,
+    vision_delay_steps_range: tuple[int, int] | None = None,
+    with_actions: bool = False,
     use_visual_gate_counter: bool | None = None,
 ) -> torch.Tensor:
     """AI_GP / ``race_obs`` state vector for the policy.
@@ -211,6 +213,7 @@ def aigp_race_observation(
         G,
         CameraFrameLatch,
         CommandedBodyVelocity,
+        KeypointDelayLine,
         attitude_roll_pitch_ned,
         flu_to_ned,
     )
@@ -262,6 +265,30 @@ def aigp_race_observation(
         if reset_ids is not None:
             camera_latch.reset(reset_ids)
 
+    # Perception latency: how long after the shutter the keypoints exist.
+    # Built after the latch because it wraps the *latched* frame -- the camera
+    # samples at its own rate and only then does inference take time.
+    keypoint_delay = None
+    if vision_delay_steps_range is not None:
+        lo_d, hi_d = vision_delay_steps_range
+        keypoint_delay = getattr(env, "_aigp_vis_delay", None)
+        if (
+            keypoint_delay is None
+            or keypoint_delay.num_envs != env.num_envs
+            or keypoint_delay.device != robot.device
+            or keypoint_delay.max_delay != int(hi_d)
+        ):
+            keypoint_delay = KeypointDelayLine(
+                env.num_envs, robot.device, max_delay=int(hi_d)
+            )
+            keypoint_delay.resample(
+                torch.arange(env.num_envs, device=robot.device), lo_d, hi_d
+            )
+            env._aigp_vis_delay = keypoint_delay
+        if reset_ids is not None:
+            keypoint_delay.resample(reset_ids, lo_d, hi_d)
+            keypoint_delay.reset(reset_ids)
+
     velocity_body = None
     if with_velocity:
         hover_trim_n = float(mass_kg) * G
@@ -305,6 +332,28 @@ def aigp_race_observation(
         )
         log(env, ["cmd_vx", "cmd_vy", "cmd_vz"], velocity_body)
 
+    # Observation v2: the four channels the policy last emitted.
+    #
+    # Deliberately ``issued_actions`` and not ``raw_actions``. The aircraft
+    # knows what it sent the instant it sends it; whether that command has
+    # reached the flight controller yet is exactly what it cannot observe.
+    # Feeding back the delayed command would return the delay to the policy as
+    # free information and undo the point of modelling it.
+    issued_actions = None
+    if with_actions:
+        term = None
+        if getattr(env, "action_manager", None) is not None:
+            try:
+                term = env.action_manager.get_term(action_name)
+            except (KeyError, ValueError, AttributeError):
+                term = None
+        if term is not None and hasattr(term, "issued_actions"):
+            issued_actions = term.issued_actions
+        else:
+            # The observation manager probes term dimensions before the action
+            # manager exists. Zeros keep the width right during that probe.
+            issued_actions = torch.zeros(env.num_envs, 4, device=robot.device)
+
     obs = build_aigp_observation(
         drone_pos_w=robot.data.root_pos_w,
         drone_quat_w=robot.data.root_quat_w,
@@ -316,6 +365,8 @@ def aigp_race_observation(
         with_velocity=with_velocity,
         with_context=with_context,
         camera_latch=camera_latch,
+        keypoint_delay=keypoint_delay,
+        actions=issued_actions,
         dt=float(env.step_dt),
     )
 

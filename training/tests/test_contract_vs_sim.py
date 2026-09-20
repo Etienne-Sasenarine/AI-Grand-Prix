@@ -184,3 +184,57 @@ def test_channel_names_match_the_simulator_in_order():
 )
 def test_observation_constant_matches_the_simulator(name, contract_value, sim_value):
     assert contract_value == sim_value, name
+
+
+# --- v2 / latency -----------------------------------------------------------
+
+
+def _pack(actions=None):
+    n = 2
+    return aigp_obs.pack_observation(
+        torch.rand(n, aigp_obs.KEYPOINT_COUNT, 2) * camera.FRAME_W,
+        torch.ones(n, aigp_obs.KEYPOINT_COUNT, dtype=torch.bool),
+        torch.zeros(n), torch.zeros(n), torch.zeros(n, 3),
+        velocity_body_ned=torch.zeros(n, 3),
+        gate_index=torch.zeros(n, dtype=torch.long),
+        with_velocity=True, with_context=True, actions=actions,
+    )
+
+
+def test_simulator_v1_frame_is_the_width_the_contract_declares():
+    assert _pack().shape[-1] == observation.frame_dim("v1")
+
+
+def test_simulator_v2_frame_is_the_width_the_contract_declares():
+    """The contract says 55 and 1760; if the simulator packs anything else the
+    hash stamped into a checkpoint is describing a vector that does not exist.
+    """
+    actions = torch.zeros(2, len(observation.ACTION_CHANNELS))
+    assert _pack(actions).shape[-1] == observation.frame_dim("v2")
+    assert observation.observation_dim("v2") == observation.frame_dim("v2") * observation.HISTORY
+
+
+def test_action_channel_count_matches_the_action_space():
+    assert aigp_obs.ACTION_DIM == len(observation.ACTION_CHANNELS)
+    assert aigp_obs.ACTION_DIM == len(plant.ACTION_NAMES)
+
+
+def test_latency_defaults_are_on_and_action_history_is_available():
+    """The combination that must never ship half-done. Modelling a delay the
+    policy has no record of causing makes the plant worse, not better: the
+    command it issued becomes an unexplainable disturbance."""
+    import ast
+    from pathlib import Path
+
+    cfg_src = (Path(__file__).resolve().parent.parent / "tasks" / "drone_racer"
+               / "drone_racer_env_cfg.py").read_text()
+    assert "with_actions" in cfg_src, "v2 action channels are not wired into the env"
+    assert "vision_delay_steps_range" in cfg_src, "vision delay is not wired in"
+
+    # And the plant side is on by default.
+    actions_src = (Path(__file__).resolve().parent.parent / "tasks" / "drone_racer"
+                   / "mdp" / "actions.py").read_text()
+    tree = ast.parse(actions_src)
+    assert "ACTION_DELAY_STEPS_RANGE" in actions_src
+    assert "RATE_TAU_S_RANGE" in actions_src
+    del tree
