@@ -24,7 +24,10 @@
 
 set -u
 
-POD_HOST="${POD_HOST:?set POD_HOST to the pod's address}"
+# No apostrophe in this message: a single quote inside ${VAR:?word} opens a
+# quoted section and the whole script fails to parse, pointing at a line thirty
+# further down.
+POD_HOST="${POD_HOST:?set POD_HOST to the pod address}"
 POD_PORT="${POD_PORT:-22}"
 POD_KEY="${POD_KEY:-$HOME/.ssh/runpod_aigp}"
 REMOTE_DIR="${REMOTE_DIR:-/workspace/aigp-sim/logs}"
@@ -48,16 +51,16 @@ pull_once() {
         return 1
     fi
 
-    # Checkpoints only. The rest of a run directory is tensorboard event files
-    # that grow without bound and are not what you would be sad to lose.
-    local before after
+    local before after newest
     before="$(find "$LOCAL_DIR" -name '*.pt' 2>/dev/null | wc -l | tr -d ' ')"
 
-    if "${SSH[@]}" "cd '$REMOTE_DIR' && tar czf - \
-            \$(find . -name '*.pt' -o -name 'params' -type d) 2>/dev/null" \
+    # Everything but the tensorboard event files, which grow without bound and
+    # are not what you would be sad to lose. Kept as one plain remote command:
+    # a nested $(find ...) inside the ssh argument is a quoting trap, and this
+    # script exists precisely for the times nobody is awake to debug it.
+    if "${SSH[@]}" "tar czf - -C '$REMOTE_DIR' --exclude='events.out.tfevents.*' ." \
             2>/dev/null | tar xzf - -C "$LOCAL_DIR" 2>/dev/null; then
         after="$(find "$LOCAL_DIR" -name '*.pt' 2>/dev/null | wc -l | tr -d ' ')"
-        local newest
         newest="$(find "$LOCAL_DIR" -name '*.pt' -exec ls -t {} + 2>/dev/null | head -1)"
         echo "[$stamp] ok: $after checkpoints locally (+$((after - before)))"
         [ -n "$newest" ] && echo "            newest: ${newest#"$LOCAL_DIR"/}"
