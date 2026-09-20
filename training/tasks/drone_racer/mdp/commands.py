@@ -244,6 +244,29 @@ class GateTargetingCommand(CommandTerm):
                     [-(self.cfg.start_run_in_m + 1.0), 0.0, 0.0], device=self.device
                 ).expand(self.num_envs, 3),
             )
+            # The start the race actually begins from, for a slice of episodes.
+            #
+            # Marked on the course map: roughly 4 m past G10 on the G10->G1
+            # leg, on the floor, 7.8 m short of G1 and very nearly on its
+            # through-axis. That is a longer run-in to one specific gate than
+            # the generic 3 m run-in below, and it is the only start that will
+            # ever happen in competition.
+            #
+            # Scattered by ``race_start_scatter_m`` because nobody sets a
+            # takeoff pad down to the centimetre, and because a policy trained
+            # on one exact coordinate learns that coordinate rather than the
+            # approach.
+            race_mask = None
+            if self.cfg.race_start_xy is not None and self.cfg.race_start_fraction > 0.0:
+                race_mask = (
+                    torch.rand(self.num_envs, device=self.device)
+                    < self.cfg.race_start_fraction
+                )
+                if bool(race_mask.any()):
+                    # Isaac index of the official start gate.
+                    tgt = torch.full_like(self.next_gate_idx, int(self.cfg.race_start_idx))
+                    self.next_gate_idx = torch.where(race_mask, tgt, self.next_gate_idx)
+
             if self.cfg.floor_start_fraction > 0.0:
                 # A mixture, not a switch.
                 #
@@ -314,6 +337,26 @@ class GateTargetingCommand(CommandTerm):
             # ends its episode before the policy has acted. And it varies how
             # far there is to climb, so the policy learns to arrive at a height
             # rather than to perform one fixed ascent.
+            if race_mask is not None and bool(race_mask.any()):
+                sx, sy = self.cfg.race_start_xy
+                sc = float(self.cfg.race_start_scatter_m)
+                jitter = (torch.rand(self.num_envs, 2, device=self.device) * 2.0 - 1.0) * sc
+                gate_positions = gate_positions.clone()
+                gate_positions[:, 0] = torch.where(
+                    race_mask, sx + jitter[:, 0], gate_positions[:, 0])
+                gate_positions[:, 1] = torch.where(
+                    race_mask, sy + jitter[:, 1], gate_positions[:, 1])
+                # These start on the floor whatever the run-in draw said, and
+                # the +1 m normal offset reset_after_prev_gate adds would push
+                # them off the pad, so cancel it for these envs only.
+                back_off = math_utils.quat_apply(
+                    gate_orientations,
+                    torch.tensor([-1.0, 0.0, 0.0], device=self.device).expand(self.num_envs, 3),
+                )
+                gate_positions = torch.where(
+                    race_mask.unsqueeze(-1), gate_positions + back_off, gate_positions)
+                at_run_in = at_run_in | race_mask.unsqueeze(-1)
+
             if self.cfg.spawn_z_range is not None:
                 lo, hi = self.cfg.spawn_z_range
                 gate_positions = gate_positions.clone()
@@ -563,6 +606,37 @@ class GateTargetingCommandCfg(CommandTermCfg):
 
     start_run_in_m: float = 3.0
     """Metres behind the first gate (along ``-n̂``) when an episode starts on gate 1."""
+
+    race_start_xy: tuple[float, float] | None = None
+    """Hall (x, y) of the takeoff pad the competition run actually starts from.
+
+    The organizer spec times a run "from the first timing line cross / gate
+    trigger" and says gates are flown in numerical order from Gate 1, so where
+    the aircraft leaves the ground is ours to choose -- but there is exactly
+    one such place per run, and the policy has to fly it.
+
+    Set with ``race_start_fraction`` and ``race_start_idx``. Episodes drawn for
+    it spawn here on the floor, targeting the start gate, whatever the rest of
+    the start distribution is doing.
+    """
+
+    race_start_fraction: float = 0.0
+    """Fraction of episodes beginning at ``race_start_xy``.
+
+    Deliberately a slice, not the whole thing. The start happens once per run
+    and the other twenty-one gates happen after it, so a policy that trains
+    mostly on the start would be optimising the rarest part of the race.
+    """
+
+    race_start_scatter_m: float = 0.8
+    """Half-width of the jitter on the pad position, metres.
+
+    A takeoff pad is not placed to the centimetre, and a policy trained on one
+    exact coordinate learns the coordinate rather than the approach.
+    """
+
+    race_start_idx: int = 6
+    """Isaac collection index of the start gate. 6 is official G1."""
 
     floor_start_fraction: float = 0.0
     """Fraction of episodes that begin stationary at the run-in, not in motion.

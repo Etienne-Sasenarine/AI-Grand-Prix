@@ -208,3 +208,55 @@ def test_racing_floor_spawn_clears_the_ground():
     assert rng is not None
     assert rng[0] > 0.05, f"floor of {rng[0]} m is too close to the ground"
     assert rng[0] < rng[1]
+
+
+def _racer_cfg_assign(name):
+    import ast
+    from pathlib import Path
+    src = (Path(__file__).resolve().parent.parent / "tasks" / "drone_racer"
+           / "drone_racer_env_cfg.py").read_text()
+    for node in ast.walk(ast.parse(src)):
+        if (isinstance(node, ast.Assign)
+                and isinstance(node.targets[0], ast.Attribute)
+                and node.targets[0].attr == name):
+            return ast.literal_eval(node.value)
+    return None
+
+
+def test_race_start_sits_between_g10_and_g1():
+    """The pad is on the G10->G1 leg, not somewhere off the course.
+
+    Pinned because the coordinate was read off a map by eye: a typo that put
+    it inside a wall or behind a gate would train a start that cannot exist,
+    and nothing else in the suite looks at where it is.
+    """
+    import math
+    xy = _racer_cfg_assign("race_start_xy")
+    assert xy is not None, "racing never sets race_start_xy"
+    G10, G1 = (3.96, 16.76), (3.66, 28.65)
+    d10, d1 = math.dist(xy, G10), math.dist(xy, G1)
+    assert d10 < d1, "the pad should be nearer G10 than G1 -- it is behind the start gate"
+    assert 2.0 < d10 < 8.0, f"{d10:.1f} m past G10 is not on that leg"
+    assert 5.0 < d1 < 12.0, f"{d1:.1f} m to G1 is not a plausible run-in"
+    # Lateral offset from the straight G10->G1 line.
+    t = ((xy[0]-G10[0])*(G1[0]-G10[0]) + (xy[1]-G10[1])*(G1[1]-G10[1])) / math.dist(G10, G1)**2
+    proj = (G10[0] + t*(G1[0]-G10[0]), G10[1] + t*(G1[1]-G10[1]))
+    assert math.dist(xy, proj) < 1.5, "the pad is well off the G10-G1 line"
+
+
+def test_race_start_targets_the_official_first_gate():
+    """Isaac index 6 is official G1. The organizer table says gates are flown
+    in numerical order starting at Gate 1, so the start gate is not a choice."""
+    assert _racer_cfg_assign("race_start_idx") == 6
+
+
+def test_start_distribution_leaves_most_episodes_racing():
+    """The start happens once per run; the other twenty-one gates happen after
+    it. A policy trained mostly on starts optimises the rarest part of the
+    race, which is the overfitting this split exists to avoid."""
+    race = _racer_cfg_assign("race_start_fraction") or 0.0
+    floor = _racer_cfg_assign("floor_start_fraction") or 0.0
+    assert race > 0.0, "the competition start is never trained"
+    assert floor > 0.0, "close-range starts are only trained at one gate"
+    assert race + floor < 0.5, (
+        f"{race + floor:.0%} of episodes are starts; most should be racing")

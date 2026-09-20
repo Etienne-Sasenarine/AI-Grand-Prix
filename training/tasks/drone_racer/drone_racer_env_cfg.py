@@ -546,7 +546,18 @@ class DroneRacerEnvCfg(ManagerBasedRLEnvCfg):
         #
         # A quarter rather than all of them: the other three quarters are what
         # teach carrying speed between gates, which is the rest of the race.
-        self.commands.target.floor_start_fraction = 0.25
+        # The competition start: on the floor about 4 m past G10, 7.8 m short
+        # of G1 and nearly on its through-axis. Marked off the course map.
+        # One in five episodes flies the real thing.
+        self.commands.target.race_start_xy = (4.3, 20.9)
+        self.commands.target.race_start_fraction = 0.20
+        self.commands.target.race_start_scatter_m = 0.8
+        self.commands.target.race_start_idx = 6      # official G1
+        # A further slice starts on the floor at a generic run-in to *any*
+        # gate. That is what stops the policy learning the start rather than
+        # learning to start: close-range threading from rest has to generalise
+        # across gates, not be memorised at one.
+        self.commands.target.floor_start_fraction = 0.15
         # 0.12 m is wheels-down without touching: the collision termination
         # fires at 0.01 N, so an aircraft resting on the floor would end its
         # episode before the policy acted. Up to 0.5 m covers a hand launch.
