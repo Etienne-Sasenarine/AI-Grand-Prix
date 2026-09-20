@@ -40,6 +40,17 @@ class HoverRewardsCfg:
     out a degenerate way of satisfying it or keeps the perception honest.
     """
 
+    # Broad pull toward the hold point, with reach. station_keep alone has
+    # none -- a 0.75 m Gaussian is numerically zero past a few metres -- so
+    # without this a policy spawned anywhere but on the point has no gradient
+    # and the spawn has to be narrowed to compensate. Widening the reward
+    # instead is what lets the spawn scatter across the gate's visible region,
+    # which is how the aircraft will actually be handed over in a cage.
+    approach = RewTerm(
+        func=mdp.approach,
+        weight=0.6,
+        params={"command_name": "target", "std": 3.0, "standoff_m": STANDOFF_M},
+    )
     # The objective. Gaussian on distance to the hold point.
     station_keep = RewTerm(
         func=mdp.station_keep,
@@ -142,6 +153,20 @@ class DroneHoverEnvCfg(DroneRacerEnvCfg):
         # offset rather than starting perfect.
         self.commands.target.start_at_run_in = True
         self.commands.target.start_run_in_m = STANDOFF_M
+        # Scatter the spawn across the region where the gate is in frame,
+        # rather than dropping the aircraft on the point it is meant to hold.
+        #
+        # Spawning on the hold point was the first fix for station_keep having
+        # no reach, and it worked while producing a policy that only knows how
+        # to hold from somewhere it is already holding. The cage hands the
+        # aircraft over from wherever it happens to be.
+        #
+        # Applied before the aim heading is computed, so the gate stays in
+        # frame from every sampled position -- see spawn_scatter_m. The box is
+        # asymmetric on purpose: wide across and along the approach, tighter
+        # vertically, because the gate opening is 1.35 m off the floor and a
+        # symmetric box would put a fifth of the spawns underground.
+        self.commands.target.spawn_scatter_m = (2.5, 2.5, 0.9)
 
 
 @configclass

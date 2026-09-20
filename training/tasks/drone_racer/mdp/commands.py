@@ -261,6 +261,26 @@ class GateTargetingCommand(CommandTerm):
             # nothing for the policy to servo on. Aim from where the drone will
             # actually appear, which is 1 m past the previous gate (the offset
             # reset_after_prev_gate applies).
+            # Scatter the spawn *before* the heading is computed, not after.
+            #
+            # reset_after_prev_gate applies pose_range jitter on top of whatever
+            # pose it is handed, and the heading below is derived from the
+            # un-jittered position -- so widening that jitter aims the camera
+            # away from the gate by up to the scatter angle. At 2 m out a 3 m
+            # sideways offset is 56 degrees, well outside the 72.8 degree
+            # horizontal frame: the gate leaves view and the observation goes
+            # blind, which is the one thing a perception-driven spawn must not
+            # do.
+            #
+            # Applying it here instead means the heading is aimed from where
+            # the aircraft will actually appear, so the gate is in frame by
+            # construction however wide the scatter gets.
+            if self.cfg.spawn_scatter_m is not None:
+                sx, sy, sz = self.cfg.spawn_scatter_m
+                spread = torch.tensor([sx, sy, sz], device=self.device)
+                offset = (torch.rand(self.num_envs, 3, device=self.device) * 2.0 - 1.0) * spread
+                gate_positions = gate_positions + offset
+
             spawn_pos = gate_positions + math_utils.quat_apply(
                 gate_orientations,
                 torch.tensor([1.0, 0.0, 0.0], device=self.device).expand(self.num_envs, 3),
@@ -272,8 +292,12 @@ class GateTargetingCommand(CommandTerm):
             heading_quat = math_utils.quat_from_euler_xyz(zeros, zeros, aim_yaw)
 
             play_start = not self.cfg.randomise_start
-            xy = 0.0 if play_start else float(self.cfg.reset_pos_xy_m)
-            z = 0.0 if play_start else float(self.cfg.reset_pos_z_m)
+            # Position jitter is already applied above when spawn_scatter_m is
+            # set; applying it twice would reintroduce the heading error the
+            # scatter block exists to avoid. Attitude jitter is unaffected.
+            scattered = self.cfg.spawn_scatter_m is not None
+            xy = 0.0 if (play_start or scattered) else float(self.cfg.reset_pos_xy_m)
+            z = 0.0 if (play_start or scattered) else float(self.cfg.reset_pos_z_m)
             rp = 0.0 if play_start else float(self.cfg.reset_roll_pitch_rad)
             yw = 0.0 if play_start else float(self.cfg.reset_yaw_rad)
             reset_after_prev_gate(
@@ -493,6 +517,23 @@ class GateTargetingCommandCfg(CommandTermCfg):
 
     start_run_in_m: float = 3.0
     """Metres behind the first gate (along ``-n̂``) when an episode starts on gate 1."""
+
+    spawn_scatter_m: tuple[float, float, float] | None = None
+    """Half-width of a uniform box scattering the spawn, applied before heading.
+
+    ``None`` keeps the original behaviour: spawn on the nominal point, with
+    ``reset_pos_xy_m`` / ``reset_pos_z_m`` jitter added afterwards.
+
+    Set it and the scatter happens *before* the aim heading is computed, so the
+    aircraft is pointed at the gate from wherever it actually lands and the
+    gate stays in frame however wide the box. That is what makes a wide spawn
+    usable for a perception-driven task: the policy sees the gate from a real
+    spread of positions rather than from one specific spot, which is how it
+    will be handed the aircraft in a cage.
+
+    Needs a reward with reach to be useful -- a Gaussian 0.75 m wide has none
+    past a couple of metres. ``drone_hover.mdp.approach`` is the companion.
+    """
 
     start_at_run_in: bool = False
     """Start every episode in front of the target gate, not after the previous one.

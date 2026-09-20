@@ -136,3 +136,37 @@ def settled(
     near = torch.norm(asset.data.root_pos_w - target, dim=1) < radius_m
     slow = torch.norm(asset.data.root_lin_vel_w, dim=1) < speed_m_s
     return (near & slow).to(dtype=torch.float32)
+
+
+def approach(
+    env: ManagerBasedRLEnv,
+    command_name: str,
+    std: float = 3.0,
+    standoff_m: float = 2.0,
+    asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
+) -> torch.Tensor:
+    """Broad pull toward the hold point: ``exp(-d / std)``.
+
+    Exists because ``station_keep`` has no reach. A Gaussian with a 0.75 m
+    width returns ``exp(-178)`` at ten metres -- indistinguishable from zero in
+    float32 -- so a policy that starts anywhere but on top of the hold point
+    has no gradient to follow and learns nothing.
+
+    The first fix for that was to move the *spawn* onto the hold point, which
+    worked and was the wrong lever: it produced a policy that only knows how to
+    hold from somewhere it is already holding. In the cage the aircraft is
+    handed over from wherever it happens to be, not from 2.0 m out on the gate
+    normal.
+
+    So the reward gets the reach instead, and the spawn widens to anywhere the
+    gate is visible. Exponential rather than Gaussian on purpose: its tail
+    decays slowly enough to still be a usable gradient at five or six metres,
+    which is the whole point. Pairing a broad shaping term with a narrow
+    precision term is the standard shape for approach-then-hold, and keeps
+    ``station_keep`` and ``settled`` meaning what they meant -- this term pays
+    for getting there, they pay for staying.
+    """
+    asset: RigidObject = env.scene[asset_cfg.name]
+    target = hold_point(env, command_name, standoff_m=standoff_m)
+    distance = torch.norm(asset.data.root_pos_w - target, dim=1)
+    return torch.exp(-distance / std)
