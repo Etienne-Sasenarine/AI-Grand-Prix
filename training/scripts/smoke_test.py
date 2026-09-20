@@ -53,7 +53,7 @@ import isaaclab_tasks  # noqa: E402,F401
 from isaaclab_tasks.utils import parse_env_cfg  # noqa: E402
 
 import tasks  # noqa: E402,F401
-from contract import plant, verify  # noqa: E402
+from contract import observation, plant, verify  # noqa: E402
 
 
 class Checks:
@@ -178,6 +178,44 @@ def main() -> int:
         "zero action gives a plausible collective",
         f"{float(ratio.min()):.3f}..{float(ratio.max()):.3f} g",
     )
+
+    # --- latency: is the plant delaying anything at all? -------------------
+    if action_term.cfg.action_delay_steps_range is not None:
+        delays = action_term._action_delay
+        lo_d, hi_d = action_term.cfg.action_delay_steps_range
+        checks.record(
+            bool(((delays >= lo_d) & (delays <= hi_d)).all()),
+            "action delays stay in range",
+            f"{int(delays.min())}..{int(delays.max())} steps of {(lo_d, hi_d)}",
+        )
+        checks.record(
+            len(delays.unique()) > 1 or unwrapped.num_envs == 1,
+            "action delay varies between envs",
+            f"{len(delays.unique())} distinct values",
+        )
+    if action_term.cfg.rate_tau_s_range is not None:
+        alpha = action_term._rate_alpha
+        checks.record(
+            bool(((alpha > 0.0) & (alpha < 1.0)).all()),
+            "rate filter leaves real lag",
+            f"alpha {float(alpha.min()):.3f}..{float(alpha.max()):.3f}",
+        )
+
+    # --- observation: is it the width the contract promises? ---------------
+    obs, _ = env.reset()
+    policy_obs = obs["policy"] if isinstance(obs, dict) else obs
+    width = int(policy_obs.shape[-1])
+    expected_v1 = observation.observation_dim("v1")
+    expected_v2 = observation.observation_dim("v2")
+    checks.record(
+        width in (expected_v1, expected_v2),
+        "observation width matches the contract",
+        f"{width} (v1={expected_v1}, v2={expected_v2})",
+    )
+    if width == expected_v2:
+        print(f"  note: running observation v2, hash {verify.short_hash('v2')}")
+    elif width == expected_v1:
+        print(f"  note: running observation v1, hash {verify.short_hash('v1')}")
 
     # --- 5. step it --------------------------------------------------------
     obs, _ = env.reset()

@@ -158,7 +158,7 @@ def stick_to_newtons(
     one interpretable parameter, it pins hover exactly, it stays monotonic, and
     it cuts the rail error from ~49% to under 10%. A better-fitting form would
     be false precision until this airframe has been on a thrust stand, and the
-    ``PLANT_QUAD_SHARE_RANGE`` we randomise over is wider than the residual.
+    ``PLANT_TWR_RANGE`` we randomise over is wider than the residual.
 
     ``hover_stick`` and ``quad_share`` may be per-env tensors.
     """
