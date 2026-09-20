@@ -281,6 +281,27 @@ class GateTargetingCommand(CommandTerm):
                 offset = (torch.rand(self.num_envs, 3, device=self.device) * 2.0 - 1.0) * spread
                 gate_positions = gate_positions + offset
 
+            # Sample the start height, after any scatter and before the
+            # heading is aimed.
+            #
+            # The offset reset_after_prev_gate applies is along the gate
+            # normal, horizontal for an upright gate, so setting z here
+            # survives it: the aircraft appears below where it is meant to end
+            # up and has to climb.
+            #
+            # A range rather than the floor, for two reasons. It keeps the
+            # bottom of the range clear of the ground -- the collision
+            # termination fires at 0.01 N, so an aircraft resting on the floor
+            # ends its episode before the policy has acted. And it varies how
+            # far there is to climb, so the policy learns to arrive at a height
+            # rather than to perform one fixed ascent.
+            if self.cfg.spawn_z_range is not None:
+                lo, hi = self.cfg.spawn_z_range
+                gate_positions = gate_positions.clone()
+                gate_positions[:, 2] = (
+                    torch.rand(self.num_envs, device=self.device) * (hi - lo) + lo
+                )
+
             spawn_pos = gate_positions + math_utils.quat_apply(
                 gate_orientations,
                 torch.tensor([1.0, 0.0, 0.0], device=self.device).expand(self.num_envs, 3),
@@ -517,6 +538,20 @@ class GateTargetingCommandCfg(CommandTermCfg):
 
     start_run_in_m: float = 3.0
     """Metres behind the first gate (along ``-n̂``) when an episode starts on gate 1."""
+
+    spawn_z_range: tuple[float, float] | None = None
+    """Uniform range to sample the spawn height from, overriding the nominal one.
+
+    ``None`` spawns the aircraft in the air at the point it is meant to hold,
+    which trains recovery-to-hover but never a climb. Set a range and the
+    episode starts low: the aircraft must rise to the hold point and then keep
+    it, which is what a cage test looks like when someone sets the drone down
+    and arms it.
+
+    Keep the floor of the range clear of zero. The collision termination fires
+    at 0.01 N, so an aircraft resting on the ground ends its episode before the
+    policy has acted at all.
+    """
 
     spawn_scatter_m: tuple[float, float, float] | None = None
     """Half-width of a uniform box scattering the spawn, applied before heading.

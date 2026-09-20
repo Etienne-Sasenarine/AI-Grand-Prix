@@ -92,6 +92,7 @@ def main() -> int:
           f"z {float(lo[2]):.1f}..{float(hi[2]):.1f}", flush=True)
 
     heights, speeds, gate_dists, target_dists = [], [], [], []
+    xy_x, xy_y = [], []
     n_collisions = 0
 
     obs, _ = wrapped.reset()
@@ -122,6 +123,8 @@ def main() -> int:
             nearest = d_all.min(dim=1).values
             target = torch.norm(cmd.command[idx, :3] - pos, dim=-1)
 
+            xy_x.append(pos[:, 0].clone())
+            xy_y.append(pos[:, 1].clone())
             heights.append(pos[:, 2].clone())
             speeds.append(torch.norm(vel, dim=-1).clone())
             gate_dists.append(nearest.clone())
@@ -164,6 +167,20 @@ def main() -> int:
           f"p05 {percentile(z, 0.05):.2f} m", flush=True)
     print(f"  dist to nearest gate  median {float(dg.median()):.2f} m", flush=True)
     print(f"  dist to TARGET gate   median {float(dt.median()):.2f} m", flush=True)
+
+    # Dump the impact coordinates so the crashes can be drawn on the course.
+    # A per-gate failure rate says which gate is hard; a map says *where* on
+    # the leg the aircraft is losing it, which is a different question and the
+    # one that tells you whether it is overshooting turns or clipping frames.
+    import json
+    xs = torch.cat([h for h in xy_x]).tolist()
+    ys = torch.cat([h for h in xy_y]).tolist()
+    with open("/workspace/logs/crash_xy.json", "w") as fh:
+        json.dump({"x": [round(v, 2) for v in xs],
+                   "y": [round(v, 2) for v in ys],
+                   "z": [round(float(v), 2) for v in z.tolist()],
+                   "speed": [round(float(v), 2) for v in v.tolist()]}, fh)
+    print(f"wrote /workspace/logs/crash_xy.json ({len(xs)} points)", flush=True)
 
     print(f"\nCOLLISION_SPLIT ground={float(is_ground.float().mean()):.3f} "
           f"gate={float(is_gate.float().mean()):.3f} "

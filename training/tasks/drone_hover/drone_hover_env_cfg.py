@@ -153,20 +153,31 @@ class DroneHoverEnvCfg(DroneRacerEnvCfg):
         # offset rather than starting perfect.
         self.commands.target.start_at_run_in = True
         self.commands.target.start_run_in_m = STANDOFF_M
-        # Scatter the spawn across the region where the gate is in frame,
-        # rather than dropping the aircraft on the point it is meant to hold.
+        # The episode starts below the hold point and climbs to it.
         #
-        # Spawning on the hold point was the first fix for station_keep having
-        # no reach, and it worked while producing a policy that only knows how
-        # to hold from somewhere it is already holding. The cage hands the
-        # aircraft over from wherever it happens to be.
+        # Spawning *on* the hold point was the first fix for station_keep
+        # having no reach. It worked, and produced a policy that only knows how
+        # to hold from somewhere it is already holding -- no climb, no takeoff,
+        # nothing like how the aircraft is handed over in a cage.
         #
-        # Applied before the aim heading is computed, so the gate stays in
-        # frame from every sampled position -- see spawn_scatter_m. The box is
-        # asymmetric on purpose: wide across and along the approach, tighter
-        # vertically, because the gate opening is 1.35 m off the floor and a
-        # symmetric box would put a fifth of the spawns underground.
-        self.commands.target.spawn_scatter_m = (2.5, 2.5, 0.9)
+        # Both offsets below are applied before the aim heading is computed, so
+        # the gate stays in frame from every sampled start. From 2 m out and a
+        # foot off the floor the gate sits about 31 degrees up, inside the
+        # camera's -2.6 to +42.6 degree vertical window.
+        # Start low and climb. One foot off the floor to the gate's own centre
+        # height, sampled per episode, so the aircraft learns to *arrive* at a
+        # height rather than to perform one fixed ascent -- and sometimes it is
+        # already there and only has to hold.
+        #
+        # The floor of the range is deliberately not the floor of the arena:
+        # the collision termination fires at 0.01 N, so an aircraft resting on
+        # the ground would end its episode before acting.
+        self.commands.target.spawn_z_range = (0.30, 1.35)
+        # Horizontal scatter stays modest. The task is "go up and hold", not
+        # "fly across and hold", so the climb should be roughly vertical --
+        # but not identical every time, or the policy learns one trajectory
+        # instead of a controller.
+        self.commands.target.spawn_scatter_m = (0.8, 0.8, 0.0)
 
 
 @configclass
