@@ -96,8 +96,14 @@ def reset_after_prev_gate(
 # band can be switched on in one line if the A/B says otherwise.
 BODY_INERTIA_DIAG = (0.0040, 0.0055, 0.0075)
 
-# The aircraft on the scale. Must equal ``contract.plant.MASS_KG``; a test
-# parses this literal to make sure it still does.
+# The aircraft on the scale: all-up competition weight, **props included**.
+# Must equal ``contract.plant.MASS_KG``; a test parses this literal to make
+# sure it still does.
+#
+# Props therefore come out of this number, not on top of it -- the airframe
+# link gets 1.745 minus the four props, and the five links sum to 1.745. The
+# other reading gives a 1.765 kg aircraft and is the obvious way for someone
+# to "fix" this later, so: confirmed with the person who weighed it.
 AIRFRAME_MASS_KG = 1.745
 
 # Mass of one propeller, and its inertia about its own centre.

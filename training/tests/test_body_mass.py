@@ -117,6 +117,17 @@ def test_total_mass_is_what_the_aircraft_weighs(env):
     assert total == pytest.approx(AIRFRAME_MASS_KG, abs=1e-6)
 
 
+def test_props_come_out_of_the_total_not_on_top_of_it(env):
+    """1.745 kg is all-up competition weight with props fitted, so the five
+    links sum to it and the airframe link is *lighter* than it. Adding the
+    props to the total instead would give a 1.765 kg aircraft -- a small error,
+    but the plausible-looking way for someone to misread this later."""
+    set_body_mass(env, None)
+    masses = env._asset.root_physx_view.masses[0]
+    assert float(masses[BODY_ID]) < AIRFRAME_MASS_KG
+    assert float(masses.sum()) == pytest.approx(AIRFRAME_MASS_KG, abs=1e-6)
+
+
 def test_total_holds_for_any_prop_mass(env):
     """The airframe takes whatever the props leave, so the total is
     arithmetic rather than three numbers maintained by hand. Revising the prop

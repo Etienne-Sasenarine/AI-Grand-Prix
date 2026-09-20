@@ -64,6 +64,10 @@ class Checks:
 
     def record(self, ok: bool, name: str, detail: str = "") -> bool:
         self.rows.append((bool(ok), name, detail))
+        # Flush as we go. Isaac can take the process down without unwinding,
+        # and a check that ran but whose result died in a stdio buffer is
+        # indistinguishable from a check that never ran.
+        sys.stdout.flush()
         return bool(ok)
 
     def report(self) -> int:
@@ -79,9 +83,20 @@ class Checks:
         if failed:
             print(f"{len(failed)} of {len(self.rows)} checks FAILED: {', '.join(failed)}")
             print("Do not start a training run until these pass.")
-            return 1
-        print(f"all {len(self.rows)} checks passed")
-        return 0
+        else:
+            print(f"all {len(self.rows)} checks passed")
+
+        # The authoritative result. Not the exit status: Isaac Sim's
+        # ``SimulationApp.close()`` hard-exits the process, so whatever this
+        # function returns may never reach ``sys.exit``, and the shell sees 0
+        # whether every check passed or none did. A runner that trusted the
+        # exit code would green-light training on a broken plant -- which is
+        # precisely the failure this script exists to prevent, so the result
+        # goes on stdout where it cannot be swallowed.
+        print(f"SMOKE_RESULT={'PASS' if not failed else 'FAIL'} "
+              f"passed={len(self.rows) - len(failed)}/{len(self.rows)}")
+        sys.stdout.flush()
+        return 1 if failed else 0
 
 
 def main() -> int:
