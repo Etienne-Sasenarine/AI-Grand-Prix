@@ -83,7 +83,14 @@ def measure(num_envs: int) -> dict | None:
         env.close()
         return None
 
-    peak_gb = torch.cuda.max_memory_allocated() / 1024**3
+    # Both figures, because the interesting one is not the obvious one.
+    # torch.cuda only sees its own allocator: PhysX holds the simulation state
+    # outside it, and at 4096 envs that is ~7 GB against torch's 0.14. Sizing a
+    # run off the torch number would suggest the card is nearly empty when it
+    # is not, so the device-wide reading is what gets reported.
+    torch_gb = torch.cuda.max_memory_allocated() / 1024**3
+    free_b, total_b = torch.cuda.mem_get_info()
+    device_gb = (total_b - free_b) / 1024**3
     steps_per_s = args.steps / elapsed
     env_steps_per_s = steps_per_s * num_envs
 
@@ -92,7 +99,8 @@ def measure(num_envs: int) -> dict | None:
         "num_envs": num_envs,
         "it_per_s": steps_per_s,
         "env_steps_per_s": env_steps_per_s,
-        "peak_gb": peak_gb,
+        "device_gb": device_gb,
+        "torch_gb": torch_gb,
         "build_s": build_s,
     }
 
@@ -102,9 +110,9 @@ def main() -> int:
     total_gb = torch.cuda.get_device_properties(0).total_memory / 1024**3
     print(f"\ndevice: {torch.cuda.get_device_name(0)}  ({total_gb:.1f} GB)", flush=True)
     print(f"task:   {args.task}", flush=True)
-    print(f"\n  {'envs':>6}  {'it/s':>8}  {'env-steps/s':>12}  {'peak GB':>8}  "
-          f"{'build s':>8}  {'vs prev':>8}", flush=True)
-    print("  " + "-" * 62, flush=True)
+    print(f"\n  {'envs':>6}  {'it/s':>8}  {'env-steps/s':>12}  {'GPU GB':>7}  "
+          f"{'torch':>6}  {'build s':>8}  {'vs prev':>8}", flush=True)
+    print("  " + "-" * 70, flush=True)
 
     results = []
     for num_envs in counts:
@@ -118,8 +126,8 @@ def main() -> int:
             ratio = row["env_steps_per_s"] / results[-1]["env_steps_per_s"]
             gain = f"{ratio:+.2f}x" if ratio < 1 else f"{ratio:.2f}x"
         print(f"  {row['num_envs']:>6}  {row['it_per_s']:>8.2f}  "
-              f"{row['env_steps_per_s']:>12,.0f}  {row['peak_gb']:>8.2f}  "
-              f"{row['build_s']:>8.1f}  {gain:>8}", flush=True)
+              f"{row['env_steps_per_s']:>12,.0f}  {row['device_gb']:>7.1f}  "
+              f"{row['torch_gb']:>6.2f}  {row['build_s']:>8.1f}  {gain:>8}", flush=True)
         results.append(row)
 
     if not results:
@@ -141,7 +149,7 @@ def main() -> int:
           f"{best['env_steps_per_s']:,.0f} env-steps/s", flush=True)
     print(f"knee:        {knee['num_envs']} envs at "
           f"{knee['env_steps_per_s']:,.0f} env-steps/s "
-          f"({knee['peak_gb']:.1f} GB)", flush=True)
+          f"({knee['device_gb']:.1f} GB device-wide)", flush=True)
     print(f"\nuse --num_envs {knee['num_envs']} unless memory is needed elsewhere.",
           flush=True)
     print(f"BENCH_KNEE={knee['num_envs']} "
