@@ -45,9 +45,36 @@ echo "caps=${NVIDIA_DRIVER_CAPABILITIES:-unset}"
 A `deviceName` line means you are fine. `Found no drivers` means stop and
 redeploy — nothing installed afterwards will run.
 
-**Fix:** deploy from `nvcr.io/nvidia/isaac-sim:4.5.0` (needs a free NGC account
-and its API key as registry credentials), or any template that sets
-`NVIDIA_DRIVER_CAPABILITIES` to include `graphics`.
+**Fix:** deploy from `nvcr.io/nvidia/isaac-lab:2.1.0` — it is **anonymously
+pullable**, needs no NGC credentials, and bakes the capability into its own
+image ENV, which is a different code path from the user-supplied env vars
+RunPod strips. Verified on a live pod:
+
+```
+PID 1:  NVIDIA_DRIVER_CAPABILITIES=all
+        VK_DRIVER_FILES=/etc/vulkan/icd.d/nvidia_icd.json
+```
+
+**This does fix Vulkan.** After switching images, `omni.gpu_foundation.shadercache.vulkan`
+starts and the "Found no drivers" error is gone.
+
+### ...but Isaac Sim still segfaulted, and IOMMU is the suspect
+
+With Vulkan working, `SimulationApp({"headless": True})` **segfaulted during
+`__init__`** (simulation_app.py line 270). The log carries:
+
+```
+[Warning] [gpu.foundation.plugin] IOMMU is enabled.
+```
+
+NVIDIA documents IOMMU as something to disable for Omniverse. It is a host
+BIOS/kernel setting, so **it cannot be changed from inside a rented container**.
+If this is the cause, the workaround is to land on a different host — redeploying
+may allocate a node configured differently — rather than anything in the image.
+
+Not conclusively proven: the crash log's tail is only a thread dump, and we did
+not isolate IOMMU from other causes before stopping. Treat it as the leading
+hypothesis, not a finding.
 
 ---
 
@@ -223,3 +250,35 @@ pip install -e . --no-deps && python -c "import tasks; print('ok')"
 # 5. the gate
 python scripts/smoke_test.py --headless          # must exit 0
 ```
+
+---
+
+## 7. The Isaac Lab image has no sshd, and installing one after boot fails
+
+`nvcr.io/nvidia/isaac-lab:2.1.0` ships no SSH daemon. RunPod's own startup
+script normally provides one, but **overriding the container start command
+replaces that script**, so you get a pod reachable only through
+`ssh.runpod.io` (RunPod's proxy) and not over direct TCP — which means no
+`scp` and no `rsync`.
+
+Installing sshd afterwards through the proxy does not work. Three variations
+all failed, for the same underlying reason in different clothes:
+
+| Attempt | Why it failed |
+|---|---|
+| `nohup setsid /usr/sbin/sshd &` then exit | Killed when the proxy session closed |
+| `printf '...' \| ssh` with apt in the pipeline | `printf` closes stdin, bash sees EOF and exits, killing the running apt |
+| `(printf '...'; sleep 240) \| ssh` | apt still never produced its log file; the proxy pty mangles scripted input |
+
+**Do it at boot instead.** Put the whole thing in the container start command,
+where PID 1 owns it and nothing can be orphaned:
+
+```
+bash -c 'apt-get update -qq && apt-get install -y -qq openssh-server && mkdir -p ~/.ssh && echo "$PUBLIC_KEY" >> ~/.ssh/authorized_keys && chmod 700 ~/.ssh && chmod 600 ~/.ssh/authorized_keys && ssh-keygen -A && mkdir -p /run/sshd && /usr/sbin/sshd && sleep infinity'
+```
+
+RunPod sets `$PUBLIC_KEY` for you. The trailing `sleep infinity` is what keeps
+the container alive once sshd has daemonised.
+
+**General lesson:** on this platform, anything that must outlive a shell
+belongs in the start command, not in a command you run afterwards.
