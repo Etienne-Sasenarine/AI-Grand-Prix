@@ -8,18 +8,21 @@
 
 ``--beginner`` in one paragraph
 -------------------------------
-**A person flying always gets ANGLE. The Jetson flying always gets ACRO. One
-switch decides which, and it is the one that already hands the drone to the
-Jetson.** Betaflight has a mode called MSP override -- it is how the Jetson is
-given the sticks -- and on this airframe it is switched on by one channel going
-above 1700. ``--beginner`` reads that off the flight controller and puts ANGLE
-on **the same channel, for every position where override is off**. Nothing has
-to be known about which physical switch is which, and nothing can be left in the
-wrong position: override off means a human is flying and the aircraft
-self-levels; override on means the policy is flying, and ANGLE drops away so its
-rotation-rate commands mean what it was trained to expect. When the pilot takes
-the aircraft back, it is self-levelling again the instant they do. It also sets
-the beginner tilt limit (25 degrees unless ``--tilt-limit`` says otherwise).
+**ANGLE is always on.** Decided 19 Sep: the trained policy (Plan A) is deferred
+and the slow, self-levelled Plan B is the target, so nothing we fly wants ACRO.
+A person flying, a throttle-only hover test, and Plan B itself all need the
+aircraft to level itself -- *including while the Jetson has the sticks*.
+``--beginner`` reads which channel engages MSP override (how the Jetson is given
+the sticks) and puts ANGLE across **the whole travel of that channel, 900-2100**,
+so it is on in every switch position. This is exactly the assignment the Georgia
+Tech team fly the same airframe with (``aux 5 1 4 900 2100``); they are through
+five gates. It also sets the beginner tilt limit (25 degrees unless
+``--tilt-limit`` says otherwise) -- **Plan B's angle commands must use the same
+number**, because in ANGLE mode full stick means "lean to the tilt limit".
+
+``--race`` is the older behaviour, kept for the day a rate-commanding policy
+exists: ANGLE only while override is off, ACRO once it is on. A hover script
+that checks for ANGLE will refuse to start under ``--race``, by design.
 
 The label on the transmitter does not matter to any of this, which is as well:
 the switch marked ACRO / ANGLE does not select ANGLE, and flipping it to "ANGLE"
@@ -307,7 +310,8 @@ def watch(fc, seconds: float = 60.0) -> dict:
 
 
 def assign(fc, *, aux_channel: int, low_us: int, high_us: int,
-           dry_run: bool, reassign: bool = False) -> int:
+           dry_run: bool, reassign: bool = False,
+           alongside_override: bool = False) -> int:
     ranges = read_ranges(fc)
 
     existing = find_angle(ranges)
@@ -335,9 +339,12 @@ def assign(fc, *, aux_channel: int, low_us: int, high_us: int,
 
     # And refuse to share a channel with another mode, which would turn two
     # things on at once.
+    # The one exception: ANGLE is *meant* to stay on while MSP override is on
+    # (Plan B and every hover test fly self-levelled), so those two may overlap.
     clash = [e for e in ranges
              if not is_empty(e) and e[0] != slot and e[2] == aux_channel
-             and not (high_us <= e[3] or low_us >= e[4])]
+             and not (high_us <= e[3] or low_us >= e[4])
+             and not (alongside_override and e[1] == BOX_MSP_OVERRIDE)]
     if clash:
         print(f"  aux channel {aux_channel} already carries "
               f"{describe(clash[0]).strip()}")
@@ -480,9 +487,11 @@ def main() -> int:
     ap.add_argument("--watch", action="store_true", help="find which channel a switch drives")
     ap.add_argument("--seconds", type=float, default=60.0, help="how long to watch")
     ap.add_argument("--beginner", action="store_true",
-                    help="THE ONE COMMAND: ANGLE whenever MSP override is off (a "
-                         "human is flying), ACRO when it is on (the Jetson is), "
-                         "plus the beginner tilt limit")
+                    help="THE ONE COMMAND: ANGLE always on -- for a person flying, "
+                         "for hover tests and for Plan B -- plus the beginner tilt limit")
+    ap.add_argument("--race", action="store_true",
+                    help="DEFERRED (Plan A only): ANGLE while a person flies, ACRO "
+                         "once MSP override is on, for a policy that commands rates")
     ap.add_argument("--assign", action="store_true", help="assign ANGLE by hand")
     ap.add_argument("--channel", type=int, default=None,
                     help="RC channel the switch drives (5-16), as --watch reports it")
@@ -501,13 +510,15 @@ def main() -> int:
     ap.add_argument("--yes", action="store_true", help="confirm a write")
     args = ap.parse_args()
 
-    if args.beginner and args.assign:
-        ap.error("--beginner does the assignment itself; drop --assign")
+    if (args.beginner or args.race) and args.assign:
+        ap.error("--beginner / --race do the assignment themselves; drop --assign")
+    if args.beginner and args.race:
+        ap.error("--beginner and --race are alternatives")
     if args.beginner and args.tilt_limit is None:
         args.tilt_limit = BEGINNER_TILT_DEG
-    writing = args.assign or args.beginner or args.tilt_limit is not None
+    writing = args.assign or args.beginner or args.race or args.tilt_limit is not None
     if not (args.show or args.watch or writing):
-        ap.error("pick one of --beginner, --show, --watch, --assign or --tilt-limit")
+        ap.error("pick one of --beginner, --race, --show, --watch, --assign or --tilt-limit")
     low = high = None
     if args.assign:
         if args.channel is None:
@@ -542,7 +553,7 @@ def main() -> int:
                 print("  the aircraft is ARMED. Refusing to touch it.")
                 return 2
 
-        if args.show or args.assign or args.beginner:
+        if args.show or args.assign or args.beginner or args.race:
             print()
             print("CURRENT MODE ASSIGNMENTS")
             print("=" * 68)
@@ -586,25 +597,32 @@ def main() -> int:
                   f"--assign --channel <N> --acro-at <now> --yes")
 
         code = 0
-        if args.beginner:
+        if args.beginner or args.race:
             ov = find_override(read_ranges(fc))
             if ov is None:
                 print("  MSP OVERRIDE is not assigned on this flight controller, so there")
-                print("  is no 'Jetson is flying' switch to hang ANGLE off. Use --watch and")
+                print("  is no override channel to hang ANGLE on. Use --watch and")
                 print("  --assign --acro-at instead.")
                 return 15
-            try:
-                low, high = angle_range_beside_override(ov)
-            except ValueError as e:
-                print(f"  {e}")
-                return 16
+            if args.beginner:
+                # Whole travel of the override channel: on in every switch
+                # position, override or not. This is the setup Georgia Tech fly.
+                low, high = STEP_BASE, 2100
+            else:
+                try:
+                    low, high = angle_range_beside_override(ov)
+                except ValueError as e:
+                    print(f"  {e}")
+                    return 16
             print()
             print(f"  MSP override (Jetson flies) : RC ch {ov[2] + 5}, {ov[3]}-{ov[4]} us")
-            print(f"  ANGLE (a human flies)       : RC ch {ov[2] + 5}, {low}-{high} us  "
-                  "<- every other position")
-            # An ANGLE left over from the older way of doing this is ours to move.
+            print(f"  ANGLE                       : RC ch {ov[2] + 5}, {low}-{high} us  "
+                  + ("<- ALWAYS ON, override or not" if args.beginner
+                     else "<- only while override is off"))
+            # An ANGLE left over from an earlier run of this tool is ours to move.
             code = assign(fc, aux_channel=ov[2], low_us=low, high_us=high,
-                          dry_run=args.dry_run, reassign=True)
+                          dry_run=args.dry_run, reassign=True,
+                          alongside_override=args.beginner)
         elif args.assign:
             code = assign(fc, aux_channel=args.channel - 5, low_us=low, high_us=high,
                           dry_run=args.dry_run, reassign=args.reassign)
@@ -614,14 +632,14 @@ def main() -> int:
             print("=" * 68)
             code = set_tilt_limit(fc, args.tilt_limit, dry_run=args.dry_run)
             print("=" * 68)
-        if code == 0 and (args.assign or args.beginner) and not args.dry_run:
+        if code == 0 and (args.assign or args.beginner or args.race) and not args.dry_run:
             now = angle_active_now(fc)
             if now is not None:
                 print()
                 print(f"  The flight controller now reports: "
                       f"{'ANGLE -- self-levelling is ON' if now else 'ACRO -- self-levelling is OFF'}")
                 if not now:
-                    print("  If the override switch is off, that is wrong. Do not fly; run --show.")
+                    print("  After --beginner that is wrong in any switch position. Do not fly; run --show.")
         if code == 0 and writing and not args.dry_run:
             print()
             print("  BENCH TEST BEFORE FLYING, PROPELLERS OFF:")
@@ -725,25 +743,30 @@ def _self_test() -> int:
     assert len([e for e in read_ranges(fc) if e[1] == BOX_ANGLE and not is_empty(e)]) == 1
     fc.close()
 
-    # --- --beginner: ANGLE exactly where MSP override is off ------------------
+    # --- --beginner: ANGLE always on, alongside MSP override -----------------
     b = open_link("mock")
     ov = find_override(read_ranges(b))
     assert ov is not None and (ov[2], ov[3], ov[4]) == (4, 1700, 2100), ov
-    blo, bhi = angle_range_beside_override(ov)
-    assert (blo, bhi) == (900, 1700), (blo, bhi)
     assert angle_active_now(b) is False, "nothing assigned yet: ACRO"
-    code = assign(b, aux_channel=ov[2], low_us=blo, high_us=bhi, dry_run=False, reassign=True)
-    assert code == 0, f"sharing the override channel without overlapping must be allowed, got {code}"
+    # Overlapping override is refused unless it is asked for on purpose...
+    assert assign(b, aux_channel=ov[2], low_us=900, high_us=2100, dry_run=False) == 5
+    # ...and another mode's channel is refused even then.
+    assert assign(b, aux_channel=2, low_us=900, high_us=2100, dry_run=False,
+                  alongside_override=True) == 5
+    code = assign(b, aux_channel=ov[2], low_us=900, high_us=2100, dry_run=False,
+                  reassign=True, alongside_override=True)
+    assert code == 0, code
     assert find_override(read_ranges(b)) == ov, "the override assignment must be untouched"
-    # The two switch positions seen on that channel in the 18 Sep flight log,
-    # and an unsent channel: a human is flying, so ANGLE.
-    for us in (1094, 1520, 1500):
+    for us in (1094, 1520, 1500, 1700, 1992, 2012):
         b.aux = {9: us}
-        assert angle_active_now(b) is True, f"ch9 at {us}: override off, must be ANGLE"
-    # Override engaged: the Jetson is flying, so ANGLE must be gone.
-    for us in (1700, 1992, 2012):
+        assert angle_active_now(b) is True, f"ch9 at {us}: ANGLE must be on, override or not"
+    # --race moves that same slot to 'only while override is off'.
+    rlo, rhi = angle_range_beside_override(ov)
+    assert (rlo, rhi) == (900, 1700)
+    assert assign(b, aux_channel=ov[2], low_us=rlo, high_us=rhi, dry_run=False, reassign=True) == 0
+    for us, want in ((1094, True), (1520, True), (1700, False), (1992, False)):
         b.aux = {9: us}
-        assert angle_active_now(b) is False, f"ch9 at {us}: override on, must be ACRO"
+        assert angle_active_now(b) is want, (us, want)
     b.close()
     # Override parked somewhere odd: refuse rather than invent a range.
     for odd in ((0, 50, 4, 1300, 1700), (0, 50, 4, 1100, 1500)):
@@ -815,8 +838,8 @@ def _self_test() -> int:
     print("  refused to share aux 2 with an existing mode, and refused a mid-travel --acro-at")
     print("  an old upper-half assignment (ACRO default) is only moved with --reassign")
     print("  left all five existing assignments untouched; re-running is a no-op")
-    print("  --beginner: ANGLE on the override channel at 900-1700; ch9 at 1094/1520 -> ANGLE,")
-    print("    ch9 at 1700/1992 (Jetson flying) -> ACRO; override assignment untouched")
+    print("  --beginner: ANGLE 900-2100 on the override channel -> on in every position,")
+    print("    Jetson flying or not; --race: ANGLE only while override is off")
     print("  tilt limit: byte found at 3 different offsets, 55 -> 25 changed exactly one byte,")
     print("    other PID profiles untouched, a corrupting write and a moved anchor both refused")
     return 0

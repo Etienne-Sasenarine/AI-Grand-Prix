@@ -176,10 +176,24 @@ configuration from two different flight controllers and only noticed because
 their chip IDs differ. A strip of tape with a number on each would save an
 argument later.
 
-**Never run the Betaflight CLI before flying.** `bf_cli.py` and
-`bf_beginner.py --apply` wedge this flight controller — measured twice out of
-two, and it takes a battery pull to recover. Fine at the bench, disastrous on the
-line.
+**Never run the Betaflight CLI. Not before flying, not at the bench, not to
+read something.** Team rule as of 19 Sep 2026, and it is not conditional.
+`bf_cli.py` and `bf_beginner.py --apply` wedge this flight controller — measured
+twice out of two on 18 Sep, and it takes a flight-battery pull to recover. On
+19 Sep the aircraft went unresponsive again: silent on MSP, zero bytes on a raw
+listen, and the transmitter could not reach it either. It had to be recovered by
+hand.
+
+Everything we actually need is available over MSP, which is what Configurator
+itself uses — mode assignments via `MSP_SET_MODE_RANGE` (`tools/setup_angle_mode.py`),
+the tilt limit via `MSP_PID_ADVANCED`, profile switching via `MSP_SELECT_SETTING`.
+No CLI, no reboot, no wedge.
+
+The one setting with no MSP route is `msp_override_channels_mask`. That is a
+one-off bench job for a **human**, from Betaflight Configurator over the flight
+controller's **own USB port** — never from the Jetson's serial link, where `#`
+takes every MSP port down until reboot and a stray `R` reboots into the ROM
+bootloader.
 
 **Props off for anything on the ground.**
 
