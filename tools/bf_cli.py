@@ -1,5 +1,26 @@
 """Betaflight CLI over the MSP serial port, from the Jetson.
 
+DO NOT RUN THIS. Team rule, 19 Sep 2026.
+=========================================
+Not to write, not to read, not "just a `get`". It wedges this flight
+controller: measured twice out of two on 18 Sep, and again on 19 Sep the
+aircraft went silent on MSP and unreachable from the transmitter, recovered by
+hand. Entering the CLI also sets the `CLI` arming-disable flag, which only a
+reboot clears.
+
+Read the flight controller over MSP instead -- `bf_beginner.py --probe` and
+`setup_angle_mode.py --show` cover what this was written for. Write over MSP
+too: `MSP_SET_MODE_RANGE`, `MSP_PID_ADVANCED`, `MSP_SELECT_SETTING`. That is
+the same path Configurator uses, with no reboot and no wedge.
+
+If something genuinely has no MSP route -- `msp_override_channels_mask` is the
+known case -- write the exact commands down and hand them to a human to run
+from Configurator over the flight controller's OWN USB port. Do not run them
+here, and never over the Jetson's UART.
+
+This file is kept for its documented findings and its test double, not as a
+tool to reach for.
+
     python3 bf_cli.py --dev /dev/ttyTHS1 --dump diff_all.txt
     python3 bf_cli.py --dev /dev/ttyTHS1 --cmd "get rc_smoothing"
 
