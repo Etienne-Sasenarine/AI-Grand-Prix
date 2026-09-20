@@ -151,6 +151,22 @@ class DroneHoverEnvCfg(DroneRacerEnvCfg):
         # thing that changes. Gate choice stays random and the jitter stays on:
         # the aircraft still sees every gate, and still has to correct a small
         # offset rather than starting perfect.
+        # Racing's start distribution does not belong here.
+        #
+        # This class subclasses DroneRacerEnvCfg, so super().__post_init__()
+        # brings the racing start settings with it -- and when the competition
+        # pad was added to racing, 20% of *hover* episodes silently began
+        # spawning at that pad targeting G1. Hover's hold point is derived from
+        # the target gate, so those episodes were asked to station-keep from a
+        # racing start, and the task collapsed: episode length fell from 898
+        # steps to 26.
+        #
+        # Inheritance carries the parent's future changes, not just its present
+        # ones. Anything hover must not inherit has to be cleared explicitly.
+        self.commands.target.race_start_xy = None
+        self.commands.target.race_start_fraction = 0.0
+        self.commands.target.floor_start_fraction = 0.0
+
         self.commands.target.start_at_run_in = True
         self.commands.target.start_run_in_m = STANDOFF_M
         # The episode starts below the hold point and climbs to it.

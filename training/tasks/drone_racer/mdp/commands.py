@@ -258,14 +258,28 @@ class GateTargetingCommand(CommandTerm):
             # approach.
             race_mask = None
             if self.cfg.race_start_xy is not None and self.cfg.race_start_fraction > 0.0:
-                race_mask = (
-                    torch.rand(self.num_envs, device=self.device)
+                # Draw for the *resetting* envs only, and write only their
+                # rows. next_gate_idx is persistent state: assigning the whole
+                # tensor re-targets every env in flight, so an aircraft two
+                # gates into a lap is suddenly told it is aiming at G1. The
+                # file already carries a warning about this exact mistake --
+                # "Only the reset envs: overwriting every env here erased the
+                # crossing check for all envs on any step with a reset (Sep 6
+                # run collapse)" -- and it was made again anyway.
+                race_mask = torch.zeros(
+                    self.num_envs, dtype=torch.bool, device=self.device
+                )
+                sel = (
+                    torch.rand(len(env_ids), device=self.device)
                     < self.cfg.race_start_fraction
                 )
-                if bool(race_mask.any()):
-                    # Isaac index of the official start gate.
-                    tgt = torch.full_like(self.next_gate_idx, int(self.cfg.race_start_idx))
-                    self.next_gate_idx = torch.where(race_mask, tgt, self.next_gate_idx)
+                race_mask[env_ids] = sel
+                if bool(sel.any()):
+                    start = int(self.cfg.race_start_idx)
+                    picked = self.next_gate_idx[env_ids]
+                    self.next_gate_idx[env_ids] = torch.where(
+                        sel, torch.full_like(picked, start), picked
+                    )
 
             if self.cfg.floor_start_fraction > 0.0:
                 # A mixture, not a switch.

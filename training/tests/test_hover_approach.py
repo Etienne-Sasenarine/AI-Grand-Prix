@@ -260,3 +260,35 @@ def test_start_distribution_leaves_most_episodes_racing():
     assert floor > 0.0, "close-range starts are only trained at one gate"
     assert race + floor < 0.5, (
         f"{race + floor:.0%} of episodes are starts; most should be racing")
+
+
+def test_hover_does_not_inherit_racing_start_distribution():
+    """Hover subclasses the racing config, so racing's *future* changes arrive
+    here uninvited.
+
+    That is not hypothetical. Adding the competition start pad to racing put
+    20% of hover episodes at that pad targeting G1 -- hover derives its hold
+    point from the target gate, so those episodes were asked to station-keep
+    from a racing start. Episode length fell from 898 steps to 26 and nothing
+    failed loudly; the task just stopped working.
+    """
+    import ast
+    from pathlib import Path
+
+    src = (Path(__file__).resolve().parent.parent / "tasks" / "drone_hover"
+           / "drone_hover_env_cfg.py").read_text()
+    cleared = {}
+    for node in ast.walk(ast.parse(src)):
+        if (isinstance(node, ast.Assign)
+                and isinstance(node.targets[0], ast.Attribute)
+                and node.targets[0].attr in ("race_start_fraction",
+                                             "floor_start_fraction",
+                                             "race_start_xy")):
+            cleared[node.targets[0].attr] = ast.literal_eval(node.value)
+
+    assert cleared.get("race_start_fraction") == 0.0, (
+        "hover must clear race_start_fraction; it inherits racing's value otherwise")
+    assert cleared.get("floor_start_fraction") == 0.0, (
+        "hover must clear floor_start_fraction")
+    assert cleared.get("race_start_xy") is None, (
+        "hover must clear race_start_xy")
