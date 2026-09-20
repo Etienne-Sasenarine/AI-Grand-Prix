@@ -308,8 +308,6 @@ class GateTargetingCommand(CommandTerm):
             gate_positions = torch.where(at_run_in, target_pos + back, gate_positions)
             gate_orientations = torch.where(at_run_in, target_quat, gate_orientations)
 
-            gate_w = torch.cat([gate_positions, gate_orientations], dim=1)
-
             # Face the drone at the gate it has to fly through, not down the
             # previous gate's normal. The two differ by the whole turn angle at a
             # corner, and with a 90 deg horizontal FoV that difference is enough
@@ -383,6 +381,22 @@ class GateTargetingCommand(CommandTerm):
                 gate_positions[:, 2] = torch.where(
                     on_floor, sampled, gate_positions[:, 2]
                 )
+
+            # Freeze the spawn pose *here*, after every block that moves the
+            # aircraft, not before them.
+            #
+            # torch.cat copies. Building gate_w above the scatter, the
+            # competition pad and the height range left reset_after_prev_gate
+            # holding a snapshot none of those three had touched, so all three
+            # reached only spawn_pos -- which feeds the heading and nothing
+            # else. The aircraft was aimed from the pad and placed at the gate
+            # run-in: measured, 0 of 1024 spawns within 1.5 m of the pad and
+            # none below 0.67 m, against a configured 20% and 32%.
+            #
+            # Nothing warns when a tensor stops aliasing. The check that does
+            # is reading the position back out of the simulation, which is what
+            # scripts/diag_spawn.py exists to do.
+            gate_w = torch.cat([gate_positions, gate_orientations], dim=1)
 
             spawn_pos = gate_positions + math_utils.quat_apply(
                 gate_orientations,
