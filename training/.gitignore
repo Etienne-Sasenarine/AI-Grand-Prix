@@ -1,0 +1,34 @@
+# Training output. A single PPO run writes gigabytes of TensorBoard events and
+# checkpoints; the flight repo already carries 1.5 GB of them and that is what
+# this split is partly for.
+logs/
+runs/
+outputs/
+wandb/
+
+# Policy checkpoints. Kept out deliberately -- they are large, they are
+# reproducible from a run, and a checkpoint is only meaningful alongside the
+# contract hash it trained under. Fetch the keeper from the flight repo when
+# warm-starting; see README.
+models/
+*.ckpt
+
+# Evaluation artefacts
+eval/
+*.jsonl.gz
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+
+# Isaac Sim / Omniverse scratch
+.nvidia-omniverse/
+kit/
+*.log
+
+# OS
+.DS_Store

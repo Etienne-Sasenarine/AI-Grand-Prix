@@ -1,0 +1,33 @@
+{
+  "mass_kg": null,
+  "thrust_min": null,
+  "thrust_max": null,
+  "hover_trials": [],
+  "rate_sign_trials": {
+    "roll": null,
+    "pitch": null,
+    "yaw": null
+  },
+  "rate_steps": [],
+  "inertia": {
+    "roll": null,
+    "pitch": null,
+    "yaw": null
+  },
+  "drag_samples": [],
+  "camera": {
+    "width": null,
+    "height": null,
+    "fx": null,
+    "fy": null,
+    "cx": null,
+    "cy": null,
+    "same_height_gate_cy": null
+  },
+  "timing": {
+    "control_t_s": [],
+    "camera_t_s": [],
+    "command_to_gyro_ms": []
+  },
+  "imu_rest": []
+}

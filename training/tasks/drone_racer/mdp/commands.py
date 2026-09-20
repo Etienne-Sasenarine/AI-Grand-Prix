@@ -1,0 +1,496 @@
+# Copyright (c) 2025, Kousheek Chakraborty
+# All rights reserved.
+#
+# SPDX-License-Identifier: BSD-3-Clause
+#
+# This project uses the IsaacLab framework (https://github.com/isaac-sim/IsaacLab),
+# which is licensed under the BSD-3-Clause License.
+
+from __future__ import annotations
+
+import os
+from collections.abc import Sequence
+from dataclasses import MISSING
+from typing import TYPE_CHECKING
+
+import cv2
+import isaaclab.utils.math as math_utils
+import torch
+from isaaclab.assets import Articulation, RigidObjectCollection
+from isaaclab.managers import CommandTerm, CommandTermCfg, SceneEntityCfg
+from isaaclab.markers import VisualizationMarkers, VisualizationMarkersCfg
+from isaaclab.markers.config import FRAME_MARKER_CFG
+from isaaclab.sensors import TiledCamera
+from isaaclab.utils import configclass
+
+from utils.vel_align import cam_horizontal_align, center_passage_score
+
+from .events import reset_after_prev_gate
+
+# Organizer PDF: 85x165 ft, origin top-left, Y down the sheet.
+_PDF_FT = {
+    1: (12.0, 71.0),
+    2: (16.0, 39.0),
+    3: (40.0, 17.0),
+    4: (72.0, 40.0),
+    5: (66.0, 70.0),
+    6: (41.0, 86.0),
+    7: (70.5, 106.6),
+    8: (60.0, 129.0),
+    9: (39.7, 147.7),
+    10: (13.0, 110.0),
+}
+
+
+def _official_xy_m(official_n: int) -> tuple[float, float]:
+    x_ft, y_ft = _PDF_FT[int(official_n)]
+    return x_ft * 0.3048, (165.0 - y_ft) * 0.3048
+
+
+def official_number_from_xy(x: float, y: float) -> int:
+    best_n, best_d = 1, float("inf")
+    for n, (x_ft, y_ft) in _PDF_FT.items():
+        ox, oy = x_ft * 0.3048, (165.0 - y_ft) * 0.3048
+        d = (x - ox) ** 2 + (y - oy) ** 2
+        if d < best_d:
+            best_d, best_n = d, n
+    return best_n
+
+
+def isaac_index_for_official(gate_xy, official_n: int) -> int:
+    tx, ty = _official_xy_m(official_n)
+    best_i, best_d = 0, float("inf")
+    for i in range(len(gate_xy)):
+        dx = float(gate_xy[i][0]) - tx
+        dy = float(gate_xy[i][1]) - ty
+        d = dx * dx + dy * dy
+        if d < best_d:
+            best_d, best_i = d, i
+    return best_i
+
+if TYPE_CHECKING:
+    from isaaclab.envs import ManagerBasedEnv
+
+
+class GateTargetingCommand(CommandTerm):
+    """Command generator that generates a pose command from a uniform distribution."""
+
+    cfg: GateTargetingCommandCfg
+    """Configuration for the command generator."""
+
+    def __init__(self, cfg: GateTargetingCommandCfg, env: ManagerBasedEnv):
+        """Initialize the command generator class.
+
+        Args:
+            cfg: The configuration parameters for the command generator.
+            env: The environment object.
+        """
+        # initialize the base class
+        super().__init__(cfg, env)
+
+        self.cfg = cfg
+
+        # FPV video recording
+        if self.cfg.record_fpv:
+            self.video_id = 0
+            self.fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+            self.sensor_cfg: SceneEntityCfg = SceneEntityCfg("tiled_camera")
+            self.sensor: TiledCamera = self._env.scene.sensors[self.sensor_cfg.name]
+
+        # extract the robot and track for which the command is generated
+        self.robot: Articulation = env.scene[cfg.asset_name]
+        self.track: RigidObjectCollection = env.scene[cfg.track_name]
+        self.gate_size = cfg.gate_size
+        self.num_gates = self.track.num_objects
+
+        # create buffers
+        # -- commands: (x, y, z, qw, qx, qy, qz) in simulation world frame
+        self.env_ids = torch.arange(self.num_envs, device=self.device)
+        self.prev_robot_pos_w = self.robot.data.root_pos_w.clone()
+        self._gate_missed = torch.zeros(self.num_envs, dtype=torch.bool, device=self.device)
+        self._gate_passed = torch.zeros(self.num_envs, dtype=torch.bool, device=self.device)
+        self._course_completed = torch.zeros(self.num_envs, dtype=torch.bool, device=self.device)
+        self._gate_pass_speed = torch.zeros(self.num_envs, device=self.device)
+        self._gate_pass_cam_align = torch.zeros(self.num_envs, device=self.device)
+        self._gate_pass_center = torch.zeros(self.num_envs, device=self.device)
+        self.next_gate_idx = torch.zeros(self.num_envs, dtype=torch.int32, device=self.device)
+        self.next_gate_w = torch.zeros(self.num_envs, 7, device=self.device)
+        self._lookahead_gate_w = torch.zeros(self.num_envs, 7, device=self.device)
+        self._resolved_play_start: int | None = None
+
+    def __str__(self) -> str:
+        msg = "GateTargetingCommand:\n"
+        msg += f"\tCommand dimension: {tuple(self.command.shape[1:])}\n"
+        msg += f"\tResampling time range: {self.cfg.resampling_time_range}\n"
+        return msg
+
+    """
+    Properties
+    """
+
+    @property
+    def command(self) -> torch.Tensor:
+        """The desired pose command. Shape is (num_envs, 7).
+
+        The first three elements correspond to the position, followed by the quaternion orientation in (w, x, y, z).
+        """
+        return self.next_gate_w
+
+    @property
+    def gate_missed(self) -> torch.Tensor:
+        return self._gate_missed
+
+    @property
+    def gate_passed(self) -> torch.Tensor:
+        return self._gate_passed
+
+    @property
+    def course_completed(self) -> torch.Tensor:
+        """True once the final gate of a non-looping course has been passed."""
+        return self._course_completed
+
+    @property
+    def lookahead_gate(self) -> torch.Tensor:
+        """Pose of the gate after the current target. Shape is (num_envs, 7)."""
+        return self._lookahead_gate_w
+
+    @property
+    def gate_pass_speed(self) -> torch.Tensor:
+        """Speed along the gate normal on the step a gate was passed, else zero."""
+        return self._gate_pass_speed
+
+    @property
+    def gate_pass_cam_align(self) -> torch.Tensor:
+        """Horizontal camera-to-normal ``max(0, ĉam_xy · n̂)`` on a pass, else 0."""
+        return self._gate_pass_cam_align
+
+    @property
+    def gate_pass_center(self) -> torch.Tensor:
+        """1 at the opening centre, 0 at the rim, on a pass; else 0."""
+        return self._gate_pass_center
+
+    @property
+    def previous_pos(self) -> torch.Tensor:
+        return self.prev_robot_pos_w
+
+    def official_number(self, isaac_idx: int) -> int:
+        pos = self.track.data.object_com_pos_w[0, int(isaac_idx)]
+        return official_number_from_xy(float(pos[0]), float(pos[1]))
+
+    def _play_start_idx(self) -> int:
+        official = getattr(self.cfg, "official_start_gate", None)
+        if official is None:
+            raw = os.environ.get("PLAY_START_OFFICIAL", "").strip()
+            official = int(raw) if raw else None
+        if official is not None:
+            # Isaac collection order matches env_cfg insertion: 0=G6 … 6=G1.
+            # Do not search live tensors here — first resample can run before
+            # gate poses are written, which used to snap every start to idx 0.
+            static = {1: 6, 2: 7, 3: 8, 4: 9, 5: 10, 6: 0, 7: 1, 8: 2, 9: 3, 10: 5}
+            idx = int(static.get(int(official), self.cfg.fixed_start_idx))
+            self._resolved_play_start = idx % max(self.num_gates, 1)
+            return int(self._resolved_play_start)
+        return int(self.cfg.fixed_start_idx) % max(self.num_gates, 1)
+
+    """
+    Implementation specific functions.
+    """
+
+    def _update_metrics(self):
+        pass
+
+    def _resample_command(self, env_ids: Sequence[int]):
+        # Release and reinitialize video writer only after the first iteration
+        if hasattr(self, "out") and self.cfg.record_fpv:
+            self.out.release()
+            print(f"FPV video saved as fpv_{self.video_id}.mp4")
+            self.video_id += 1
+
+        if self.cfg.record_fpv:
+            self.out = cv2.VideoWriter(f"fpv_{self.video_id}.mp4", self.fourcc, 100, (1000, 1000))
+
+        self._course_completed[env_ids] = False
+
+        official = getattr(self.cfg, "official_start_gate", None)
+        if official is None:
+            raw = os.environ.get("PLAY_START_OFFICIAL", "").strip()
+            official = int(raw) if raw else None
+        place_drone = official is not None or self.cfg.randomise_start is not None
+
+        if not place_drone:
+            self.next_gate_idx[env_ids] = 0
+
+        else:
+            if official is None and self.cfg.randomise_start:
+                self.next_gate_idx[env_ids] = torch.randint(
+                    low=0, high=self.num_gates, size=(len(env_ids),), device=self.device, dtype=torch.int32
+                )
+            else:
+                start_idx = self._play_start_idx()
+                self.next_gate_idx[env_ids] = start_idx
+
+            gate_indices = self.next_gate_idx - 1
+            gate_positions = self.track.data.object_com_pos_w[self.env_ids, gate_indices]
+            gate_orientations = self.track.data.object_quat_w[self.env_ids, gate_indices]
+
+            # 3 m run-in along ``-n̂`` of the target: play's chosen gate, or
+            # any train reset that starts on gate 1 (do not wrap to the last
+            # gate). reset_after_prev_gate then adds +1 m.
+            target_pos = self.track.data.object_com_pos_w[self.env_ids, self.next_gate_idx]
+            target_quat = self.track.data.object_quat_w[self.env_ids, self.next_gate_idx]
+            back = math_utils.quat_apply(
+                target_quat,
+                torch.tensor(
+                    [-(self.cfg.start_run_in_m + 1.0), 0.0, 0.0], device=self.device
+                ).expand(self.num_envs, 3),
+            )
+            if self.cfg.randomise_start:
+                at_run_in = (self.next_gate_idx == 0).unsqueeze(-1)
+            else:
+                at_run_in = torch.ones(self.num_envs, 1, dtype=torch.bool, device=self.device)
+            gate_positions = torch.where(at_run_in, target_pos + back, gate_positions)
+            gate_orientations = torch.where(at_run_in, target_quat, gate_orientations)
+
+            gate_w = torch.cat([gate_positions, gate_orientations], dim=1)
+
+            # Face the drone at the gate it has to fly through, not down the
+            # previous gate's normal. The two differ by the whole turn angle at a
+            # corner, and with a 90 deg horizontal FoV that difference is enough
+            # to start the episode with the target off-frame -- no keypoints, so
+            # nothing for the policy to servo on. Aim from where the drone will
+            # actually appear, which is 1 m past the previous gate (the offset
+            # reset_after_prev_gate applies).
+            spawn_pos = gate_positions + math_utils.quat_apply(
+                gate_orientations,
+                torch.tensor([1.0, 0.0, 0.0], device=self.device).expand(self.num_envs, 3),
+            )
+            target_pos = self.track.data.object_com_pos_w[self.env_ids, self.next_gate_idx]
+            aim = target_pos - spawn_pos
+            aim_yaw = torch.atan2(aim[:, 1], aim[:, 0])
+            zeros = torch.zeros_like(aim_yaw)
+            heading_quat = math_utils.quat_from_euler_xyz(zeros, zeros, aim_yaw)
+
+            play_start = not self.cfg.randomise_start
+            xy = 0.0 if play_start else float(self.cfg.reset_pos_xy_m)
+            z = 0.0 if play_start else float(self.cfg.reset_pos_z_m)
+            rp = 0.0 if play_start else float(self.cfg.reset_roll_pitch_rad)
+            yw = 0.0 if play_start else float(self.cfg.reset_yaw_rad)
+            reset_after_prev_gate(
+                env=self._env,
+                env_ids=env_ids,
+                gate_pose=gate_w,
+                heading_quat=heading_quat,
+                # Play: exact 3 m run-in, no scatter. Train: start-gate
+                # curriculum plus location noise and a small upright
+                # attitude jitter (a few degrees, not on its side).
+                # Interval pushes already supply acceleration; spawn
+                # velocity stays zero so those hits stay the accel source.
+                pose_range={
+                    "x": (-xy, xy),
+                    "y": (-xy, xy),
+                    "z": (-z, z),
+                    "roll": (-rp, rp),
+                    "pitch": (-rp, rp),
+                    "yaw": (-yw, yw),
+                },
+                velocity_range={
+                    "x": (0.0, 0.0),
+                    "y": (0.0, 0.0),
+                    "z": (0.0, 0.0),
+                    "roll": (0.0, 0.0),
+                    "pitch": (0.0, 0.0),
+                    "yaw": (0.0, 0.0),
+                },
+                asset_cfg_name=self.cfg.asset_name,
+            )
+
+        # The reset teleport is not a plane crossing. Keep prev on this side
+        # so the first physics step cannot count the start gate as already passed.
+        # Only the reset envs: overwriting every env here erased the crossing
+        # check for all envs on any step with a reset (Sep 6 run collapse).
+        # Clone first: _update_command stores root_pos_w without copying.
+        prev = self.prev_robot_pos_w.clone()
+        prev[env_ids] = self.robot.data.root_pos_w[env_ids]
+        self.prev_robot_pos_w = prev
+        self._gate_passed[env_ids] = False
+        self._gate_missed[env_ids] = False
+
+    def _update_command(self):
+        if self.cfg.record_fpv:
+            image = self.sensor.data.output["rgb"][0].cpu().numpy()
+            image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
+            self.out.write(image)
+
+        next_gate_positions = self.track.data.object_com_pos_w[self.env_ids, self.next_gate_idx]
+        next_gate_orientations = self.track.data.object_quat_w[self.env_ids, self.next_gate_idx]
+        self.next_gate_w = torch.cat([next_gate_positions, next_gate_orientations], dim=1)
+
+        # Pose of the gate *after* the current target, so the policy can see a
+        # corner before it is committed to one. Computed from the same index as
+        # ``next_gate_w`` above, before the pass check advances it, so the two
+        # always describe consecutive gates.
+        if self.cfg.loop:
+            lookahead_idx = (self.next_gate_idx + 1) % self.num_gates
+        else:
+            lookahead_idx = (self.next_gate_idx + 1).clamp(max=self.num_gates - 1)
+        self._lookahead_gate_w = torch.cat(
+            [
+                self.track.data.object_com_pos_w[self.env_ids, lookahead_idx],
+                self.track.data.object_quat_w[self.env_ids, lookahead_idx],
+            ],
+            dim=1,
+        )
+
+        # Gate passing logic
+        (roll, pitch, yaw) = math_utils.euler_xyz_from_quat(self.next_gate_w[:, 3:7])
+        normal = torch.stack([torch.cos(yaw), torch.sin(yaw)], dim=1)
+        pos_old_projected = (self.prev_robot_pos_w[:, 0] - self.next_gate_w[:, 0]) * normal[:, 0] + (
+            self.prev_robot_pos_w[:, 1] - self.next_gate_w[:, 1]
+        ) * normal[:, 1]
+        pos_new_projected = (self.robot.data.root_pos_w[:, 0] - self.next_gate_w[:, 0]) * normal[:, 0] + (
+            self.robot.data.root_pos_w[:, 1] - self.next_gate_w[:, 1]
+        ) * normal[:, 1]
+        passed_gate_plane = (pos_old_projected < 0) & (pos_new_projected > 0)
+
+        self._gate_passed = passed_gate_plane & (
+            torch.all(torch.abs(self.robot.data.root_pos_w - self.next_gate_w[:, :3]) < (self.gate_size / 2), dim=1)
+        )
+
+        self._gate_missed = passed_gate_plane & (
+            torch.any(torch.abs(self.robot.data.root_pos_w - self.next_gate_w[:, :3]) > (self.gate_size / 2), dim=1)
+        )
+
+        # Speed through the opening, along the gate normal, latched on the step
+        # of the crossing. Rewards run after this update, by which point
+        # ``next_gate_idx`` has already advanced and the normal of the gate that
+        # was actually passed is no longer recoverable. Projecting onto the
+        # normal rather than using |v| means a fast sideways drift through the
+        # opening does not read as a fast gate.
+        vel_w = self.robot.data.root_lin_vel_w
+        self._gate_pass_speed = torch.where(
+            self._gate_passed,
+            vel_w[:, 0] * normal[:, 0] + vel_w[:, 1] * normal[:, 1],
+            torch.zeros_like(vel_w[:, 0]),
+        )
+
+        # Camera look-through, latched on the same step for the same reason:
+        # the target gate advances below and its yaw would be lost.
+        n_hat = torch.stack(
+            [normal[:, 0], normal[:, 1], torch.zeros_like(normal[:, 0])], dim=-1
+        )
+        self._gate_pass_cam_align = torch.where(
+            self._gate_passed,
+            cam_horizontal_align(self.robot.data.root_quat_w, n_hat),
+            torch.zeros_like(vel_w[:, 0]),
+        )
+        self._gate_pass_center = torch.where(
+            self._gate_passed,
+            center_passage_score(
+                self.robot.data.root_pos_w,
+                self.next_gate_w[:, :3],
+                n_hat,
+                half_size=self.gate_size / 2,
+            ),
+            torch.zeros_like(vel_w[:, 0]),
+        )
+
+        # Update next gate target for the envs that passed the gate
+        self.next_gate_idx[self._gate_passed] += 1
+        if self.cfg.loop:
+            self.next_gate_idx = self.next_gate_idx % self.num_gates
+        else:
+            # Running off the end means the finish gate was passed. Latch that and
+            # clamp, so the command stays in range for the step that reports it.
+            self._course_completed |= self.next_gate_idx >= self.num_gates
+            self.next_gate_idx = self.next_gate_idx.clamp(max=self.num_gates - 1)
+
+        # Snapshot: root_pos_w is a view into a TimestampedBuffer. A live
+        # alias would make prev==curr on the next step and kill plane-cross.
+        self.prev_robot_pos_w = self.robot.data.root_pos_w.clone()
+
+    def _set_debug_vis_impl(self, debug_vis: bool):
+        # create markers if necessary for the first time
+        if debug_vis:
+            if not hasattr(self, "target_visualizer"):
+                # -- goal pose
+                self.target_visualizer = VisualizationMarkers(self.cfg.target_visualizer_cfg)
+                # -- current body pose
+                self.drone_visualizer = VisualizationMarkers(self.cfg.drone_visualizer_cfg)
+            # set their visibility to true
+            self.target_visualizer.set_visibility(True)
+            self.drone_visualizer.set_visibility(True)
+        else:
+            if hasattr(self, "target_visualizer"):
+                self.target_visualizer.set_visibility(False)
+                self.drone_visualizer.set_visibility(False)
+
+    def _debug_vis_callback(self, event):
+        # check if robot is initialized
+        # note: this is needed in-case the robot is de-initialized. we can't access the data
+        if not self.robot.is_initialized:
+            return
+        # update the markers
+        self.target_visualizer.visualize(self.next_gate_w[:, :3], self.next_gate_w[:, 3:])
+        self.drone_visualizer.visualize(self.robot.data.root_pos_w, self.robot.data.root_quat_w)
+
+
+@configclass
+class GateTargetingCommandCfg(CommandTermCfg):
+    """Configuration for gate targeting command generator."""
+
+    class_type: type = GateTargetingCommand
+
+    asset_name: str = MISSING
+    """Name of the asset in the environment for which the commands are generated."""
+
+    track_name: str = MISSING
+    """Name of the track in the environment for which the commands are generated."""
+
+    randomise_start: bool | None = None
+    """If True, the starting gate is randomised at every reset."""
+
+    fixed_start_idx: int = 0
+    """When ``randomise_start`` is False, the 0-based gate the drone starts on."""
+
+    official_start_gate: int | None = None
+    """PDF gate number (1–10). Play looks up that XY on the track instead of
+    trusting Isaac's collection index. ``PLAY_START_OFFICIAL`` overrides."""
+
+    loop: bool = True
+    """If True the course is a circuit and the target wraps from the last gate back to the first.
+
+    If False the course is point-to-point: passing the final gate sets
+    :attr:`GateTargetingCommand.course_completed` instead of wrapping, which the
+    ``course_finished`` termination uses to end the episode.
+    """
+
+    start_run_in_m: float = 3.0
+    """Metres behind the first gate (along ``-n̂``) when an episode starts on gate 1."""
+
+    reset_pos_xy_m: float = 1.0
+    """Train spawn scatter in world x/y (m). Play forces 0."""
+
+    reset_pos_z_m: float = 0.7
+    """Train spawn scatter in world z (m). Play forces 0."""
+
+    reset_roll_pitch_rad: float = 0.12
+    """Train spawn roll/pitch half-range (rad, ~7 deg). Stay upright. Play forces 0."""
+
+    reset_yaw_rad: float = 0.15
+    """Train spawn yaw half-range (rad, ~9 deg). Slight heading noise. Play forces 0."""
+
+    record_fpv: bool = False
+    """If True, the first-person view (FPV) camera is recorded during the simulation."""
+
+    gate_size: float = 1.5
+    """Size of the gate in meters. This is used to determine if the drone has passed through the gate."""
+
+    target_visualizer_cfg: VisualizationMarkersCfg = FRAME_MARKER_CFG.replace(prim_path="/Visuals/Command/goal_pose")
+    """The configuration for the goal pose visualization marker. Defaults to FRAME_MARKER_CFG."""
+
+    drone_visualizer_cfg: VisualizationMarkersCfg = FRAME_MARKER_CFG.replace(prim_path="/Visuals/Command/body_pose")
+    """The configuration for the current pose visualization marker. Defaults to FRAME_MARKER_CFG."""
+
+    # Set the scale of the visualization markers to (0.1, 0.1, 0.1)
+    target_visualizer_cfg.markers["frame"].scale = (0.0001, 0.0001, 0.0001)
+    drone_visualizer_cfg.markers["frame"].scale = (0.0001, 0.0001, 0.0001)
