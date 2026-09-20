@@ -378,6 +378,17 @@ class GateTargetingCommand(CommandTerm):
                 # gate implies -- dropping it to the floor as well would erase
                 # the in-motion start this mixture exists to preserve.
                 on_floor = at_run_in.squeeze(-1)
+                # Written straight, with no correction for the +1 m offset
+                # reset_after_prev_gate adds along the gate normal.
+                #
+                # That offset is horizontal, so it does not disturb this
+                # height -- but only because track_generator builds every gate
+                # with quat_from_euler_xyz(0, 0, yaw), roll and pitch hard
+                # zero. A gate with any pitch would carry a sin(tilt) term
+                # into z and this line would need to subtract it. The course
+                # has none, and the yaw errors this track has had are in
+                # plane, so nothing here compensates for a tilt that cannot
+                # occur.
                 gate_positions[:, 2] = torch.where(
                     on_floor, sampled, gate_positions[:, 2]
                 )

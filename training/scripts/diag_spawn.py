@@ -68,6 +68,17 @@ def main() -> int:
 
     print(f"\n{n} spawns observed over {args.resets} resets\n", flush=True)
     print(f"  z   min={z.min():.3f}  max={z.max():.3f}  mean={z.mean():.3f}", flush=True)
+    # Underground is not a small error. The reset offset runs along the gate
+    # normal, which on a tilted gate is not horizontal, so a sampled height
+    # can arrive with a sin(tilt) term on top of it.
+    under = int((z < 0.0).sum())
+    print(f"    BELOW FLOOR (z<0):   {under:5d}  {under/n:6.1%}"
+          f"{'   <-- BAD' if under else ''}", flush=True)
+    if zr is not None:
+        lo, hi = float(zr[0]), float(zr[1])
+        inb = int(((z >= lo - 1e-3) & (z <= hi + 1e-3)).sum())
+        print(f"    inside spawn_z_range [{lo}, {hi}]:  {inb:5d}  {inb/n:6.1%}",
+              flush=True)
     for lo, hi in [(0.0, 0.6), (0.6, 1.0), (1.0, 1.6), (1.6, 3.0), (3.0, 99.0)]:
         k = int(((z >= lo) & (z < hi)).sum())
         print(f"    z in [{lo:>4.1f},{hi:>4.1f})  {k:5d}  {k/n:6.1%}", flush=True)

@@ -548,20 +548,41 @@ class DroneRacerEnvCfg(ManagerBasedRLEnvCfg):
         # teach carrying speed between gates, which is the rest of the race.
         # The competition start: on the floor about 4 m past G10, 7.8 m short
         # of G1 and nearly on its through-axis. Marked off the course map.
-        # One in five episodes flies the real thing.
+        # Over a third of episodes fly the real thing, and with the generic
+        # floor starts below roughly three in five begin from rest on the
+        # ground. That is deliberately dominant. The start is the one part of
+        # the race that had a 100% failure rate, and an episode that begins at
+        # the pad does not only train the takeoff -- it continues into G1, G2
+        # and onward, so its first few seconds are the start and the other
+        # thirty-five are ordinary racing. Biasing the *start* distribution
+        # costs far less ordinary racing than the fraction suggests.
         self.commands.target.race_start_xy = (4.3, 20.9)
-        self.commands.target.race_start_fraction = 0.20
+        self.commands.target.race_start_fraction = 0.35
         self.commands.target.race_start_scatter_m = 0.8
         self.commands.target.race_start_idx = 6      # official G1
         # A further slice starts on the floor at a generic run-in to *any*
         # gate. That is what stops the policy learning the start rather than
         # learning to start: close-range threading from rest has to generalise
         # across gates, not be memorised at one.
-        self.commands.target.floor_start_fraction = 0.15
+        self.commands.target.floor_start_fraction = 0.35
         # 0.12 m is wheels-down without touching: the collision termination
         # fires at 0.01 N, so an aircraft resting on the floor would end its
         # episode before the policy acted. Up to 0.5 m covers a hand launch.
         self.commands.target.spawn_z_range = (0.12, 0.50)
+        # Scatter here rather than through reset_pos_xy_m / reset_pos_z_m.
+        #
+        # Those two are applied inside reset_after_prev_gate, from one
+        # pose_range shared by every env, after this term has finished. A
+        # +-0.7 m vertical kick is right for an aircraft arriving at gate
+        # height and ruinous for one standing on the floor: it put 15% of
+        # spawns underground, measured, the moment floor starts began actually
+        # happening. Setting spawn_scatter_m routes the same magnitudes
+        # through the block above, which runs *before* the height is sampled,
+        # so floor starts keep the height they were given and everything else
+        # is jittered exactly as before. Setting it also switches the built-in
+        # jitter off, so this is a move rather than an addition -- and it aims
+        # the heading from where the aircraft actually ends up.
+        self.commands.target.spawn_scatter_m = (1.0, 1.0, 0.7)
 
         # general settings
         # VADR-TS-001 3.2/4.4: physics runs at 120 Hz and the command rate must

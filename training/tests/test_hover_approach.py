@@ -250,16 +250,37 @@ def test_race_start_targets_the_official_first_gate():
     assert _racer_cfg_assign("race_start_idx") == 6
 
 
-def test_start_distribution_leaves_most_episodes_racing():
-    """The start happens once per run; the other twenty-one gates happen after
-    it. A policy trained mostly on starts optimises the rarest part of the
-    race, which is the overfitting this split exists to avoid."""
+def test_start_distribution_keeps_enough_in_motion_starts():
+    """Starts may dominate; they must not crowd out the back of the course.
+
+    The obvious worry is that training mostly on starts optimises the rarest
+    part of the race. It is the wrong worry. An episode beginning at the pad
+    runs forty seconds and spends perhaps four of them starting -- the rest is
+    ordinary racing into G1, G2 and onward. Start-type fraction is not
+    training-content fraction.
+
+    What in-motion starts actually buy is *gate coverage*. They begin one
+    metre past a randomly chosen gate, so the second half of the course gets
+    visited directly rather than only by surviving the first half. A policy
+    averaging nine gates that always began at G1 would essentially never see
+    G11 upward, and two laps is twenty-two.
+
+    Floor starts also carry a random gate index, so they contribute coverage
+    too; only the pad fraction is pinned to G1. So the invariant is a floor
+    under in-motion starts, not a ceiling on starts.
+    """
     race = _racer_cfg_assign("race_start_fraction") or 0.0
     floor = _racer_cfg_assign("floor_start_fraction") or 0.0
     assert race > 0.0, "the competition start is never trained"
     assert floor > 0.0, "close-range starts are only trained at one gate"
-    assert race + floor < 0.5, (
-        f"{race + floor:.0%} of episodes are starts; most should be racing")
+    # The two draws are independent and OR'd, so in-motion is the product of
+    # the complements -- not 1 - race - floor.
+    in_motion = (1.0 - race) * (1.0 - floor)
+    assert in_motion > 0.25, (
+        f"only {in_motion:.0%} of episodes start in motion; the back half of "
+        "the course stops being visited")
+    assert race < 0.6, (
+        f"{race:.0%} of episodes are pinned to G1; gate coverage collapses")
 
 
 def test_hover_does_not_inherit_racing_start_distribution():
