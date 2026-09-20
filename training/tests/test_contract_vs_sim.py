@@ -84,6 +84,57 @@ def test_inertia_estimate_matches_the_event_that_writes_it():
     assert tuple(written) == tuple(plant.INERTIA_DIAG)
 
 
+def _events_literal(name: str):
+    """Read a module-level literal out of events.py without importing it."""
+    import ast
+    from pathlib import Path
+
+    source = (Path(__file__).resolve().parent.parent / "tasks" / "drone_racer"
+              / "mdp" / "events.py").read_text()
+    for node in ast.parse(source).body:
+        if isinstance(node, ast.Assign) and any(
+            isinstance(t, ast.Name) and t.id == name for t in node.targets
+        ):
+            return ast.literal_eval(node.value)
+    raise AssertionError(f"{name} not found in events.py")
+
+
+def test_airframe_mass_matches_the_event_that_writes_it():
+    """The same drift check as the inertia one, and a more consequential one.
+
+    Mass reaches PhysX only through ``set_body_mass``; the spawn config sets
+    none, because the single value ``MassPropertiesCfg`` carries would land on
+    all five rigid bodies at once. So this literal *is* what the aircraft
+    weighs in simulation, and if it parts company with the contract, the thrust
+    curve is sized for an aircraft that does not exist.
+    """
+    assert _events_literal("AIRFRAME_MASS_KG") == pytest.approx(plant.MASS_KG)
+
+
+def test_the_asset_does_not_set_mass_at_spawn():
+    """The bug itself, pinned.
+
+    ``mass_props=MassPropertiesCfg(mass=...)`` reads as a statement about the
+    aircraft and acts as a statement about every link in it. Restoring that
+    line would silently multiply the airframe by its rigid-body count, so the
+    absence of it is load-bearing and belongs under test rather than under a
+    comment.
+    """
+    import ast
+    from pathlib import Path
+
+    source = (Path(__file__).resolve().parent.parent / "assets"
+              / "five_in_drone.py").read_text()
+    for node in ast.walk(ast.parse(source)):
+        if isinstance(node, ast.keyword) and node.arg == "mass_props":
+            raise AssertionError(
+                "five_in_drone.py sets mass_props again. MassPropertiesCfg "
+                "applies its mass to every rigid body it spawns, which is how "
+                "a 1.745 kg aircraft became 8.725 kg. Mass belongs in "
+                "events.set_body_mass, which can tell the links apart."
+            )
+
+
 def test_urdf_inertia_matches_the_estimate():
     """The URDF is not what loads -- the USD is -- but it is what a re-import
     would produce, so a stale one is a trap primed for whoever next rebuilds

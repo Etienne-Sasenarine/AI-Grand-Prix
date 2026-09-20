@@ -326,13 +326,34 @@ class EventCfg:
 
     # startup
     #
-    # The USD's authored inertia is inherited from a 0.5 kg upstream aircraft
-    # and survives the 1.745 kg mass override, so it is set explicitly here.
+    # Mass first, then inertia. The asset spawns with no mass override at all,
+    # because the one MassPropertiesCfg carries would land on all five rigid
+    # bodies and make the aircraft weigh five times what it does. These three
+    # terms are what make the simulated airframe the documented one; without
+    # them it is a 0.5 kg upstream drone wearing our thrust curve.
+    body_mass = EventTerm(
+        func=mdp.set_body_mass,
+        mode="startup",
+        params={
+            "total_mass_kg": mdp.AIRFRAME_MASS_KG,
+            "prop_mass_kg": mdp.PROP_MASS_KG,
+        },
+    )
+    # The USD's authored inertia is inherited from a 0.5 kg upstream aircraft,
+    # and carries products of inertia this one should not have.
     # See ``mdp.events.BODY_INERTIA_DIAG`` for how the estimate was built.
     body_inertia = EventTerm(
         func=mdp.set_body_inertia,
         mode="startup",
         params={"inertia_diag": mdp.BODY_INERTIA_DIAG},
+    )
+    # The props are 5 g each now rather than 1.745 kg, and PhysX does not
+    # rescale inertia when mass changes -- left alone they would keep a
+    # 1.745 kg link's resistance to spinning.
+    prop_inertia = EventTerm(
+        func=mdp.set_body_inertia,
+        mode="startup",
+        params={"inertia_diag": mdp.PROP_INERTIA_DIAG, "body_name": "prop.*"},
     )
 
     # reset

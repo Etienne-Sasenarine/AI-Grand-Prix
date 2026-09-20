@@ -95,11 +95,31 @@ def test_diagonal_lands_in_slots_zero_four_eight(env):
     assert torch.allclose(row[[0, 4, 8]], torch.tensor([0.1, 0.2, 0.3]))
 
 
-def test_off_diagonal_terms_are_left_alone(env):
+def test_products_of_inertia_are_cleared(env):
+    """The authored USD carries 4.7e-4 in its off-diagonal terms -- 12% of the
+    roll moment. Writing only the diagonal leaves them, and a tensor with
+    products of inertia is a differently shaped aircraft: it couples roll into
+    pitch on every input. The fake seeds them non-zero, because a fixture that
+    starts at zero cannot tell "cleared" from "never touched"."""
+    view = env._asset.root_physx_view
+    for slot in (1, 2, 3, 5, 6, 7):
+        view.inertias[:, BODY_ID, slot] = 4.7e-4
+
     set_body_inertia(env, None, inertia_diag=(0.1, 0.2, 0.3))
-    row = env._asset.root_physx_view.inertias[0, BODY_ID]
-    off = [row[i] for i in (1, 2, 3, 5, 6, 7)]
-    assert all(float(v) == 0.0 for v in off)
+
+    row = view.inertias[0, BODY_ID]
+    assert all(float(row[i]) == 0.0 for i in (1, 2, 3, 5, 6, 7))
+    assert torch.allclose(row[[0, 4, 8]], torch.tensor([0.1, 0.2, 0.3]))
+
+
+def test_clearing_products_does_not_reach_other_bodies(env):
+    """Zeroing is per-body: a prop's tensor is not the airframe's business."""
+    view = env._asset.root_physx_view
+    view.inertias[:, 0, 1] = 4.7e-4
+
+    set_body_inertia(env, None, inertia_diag=(0.1, 0.2, 0.3))
+
+    assert float(view.inertias[0, 0, 1]) == pytest.approx(4.7e-4)
 
 
 def test_other_bodies_are_untouched(env):

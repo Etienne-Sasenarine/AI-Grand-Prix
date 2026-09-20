@@ -104,22 +104,40 @@ def main() -> int:
         "PhysX mass matches the contract",
         f"{total_mass:.4f} kg vs {plant.MASS_KG}",
     )
+    # The total alone is not enough. It is now guaranteed by construction --
+    # the airframe gets whatever the props leave -- so it would still read
+    # 1.745 kg if the whole aircraft's mass had landed on one propeller. What
+    # the original bug actually looked like was a plausible per-body number
+    # repeated five times, so check the distribution too.
+    body_id = robot.find_bodies("body")[0][0]
+    central = float(masses[0, body_id])
+    props = [float(m) for i, m in enumerate(masses[0]) if i != body_id]
+    checks.record(
+        central > 0.9 * plant.MASS_KG and all(p < 0.05 * plant.MASS_KG for p in props),
+        "mass sits on the airframe, not the props",
+        f"body {central:.4f} kg, props {[round(p, 4) for p in props]}",
+    )
 
     # Inertia is written by a startup event through a tensor API that has never
     # run here. This is the single most likely thing in this file to fail.
-    body_id = robot.find_bodies("body")[0][0]
     inertia = view.get_inertias()[0, body_id]
     diag = (float(inertia[0]), float(inertia[4]), float(inertia[8]))
     expected = plant.INERTIA_DIAG
-    close = all(abs(a - b) < 1e-6 for a, b in zip(diag, expected))
+    # Relative, not absolute. These are 4e-3 quantities making a float32 round
+    # trip through PhysX, so the last couple of digits are not ours to keep; an
+    # absolute 1e-6 bar fails on a value that is correct to six significant
+    # figures and says nothing useful when it does.
+    close = all(abs(a - b) <= 1e-3 * b for a, b in zip(diag, expected))
     checks.record(
         close,
         "PhysX inertia matches the estimate",
-        f"{tuple(round(d, 5) for d in diag)} vs {expected}",
+        f"{tuple(round(d, 6) for d in diag)} vs {expected}",
     )
     off_diagonal = [float(inertia[i]) for i in (1, 2, 3, 5, 6, 7)]
     checks.record(
-        all(abs(v) < 1e-9 for v in off_diagonal),
+        # Against the smallest principal moment, so the bar scales with the
+        # airframe rather than with float32.
+        max(abs(v) for v in off_diagonal) <= 1e-3 * min(expected),
         "inertia products are zero",
         f"max |off-diagonal| = {max(abs(v) for v in off_diagonal):.2e}",
     )
@@ -167,16 +185,26 @@ def main() -> int:
     # directly, so this exercises what training exercises.
     env.reset()
     zero = torch.zeros(unwrapped.num_envs, 4, device=unwrapped.device)
-    env.step(zero)
-    applied = action_term._applied_thrust_n
+    _, _, terminated, truncated, _ = env.step(zero)
+
+    # An env that ended during that step has already been reset, and reset
+    # zeroes ``_applied_thrust_n`` -- a fresh episode has issued no command
+    # yet. Reading it back would score that env at 0 g and fail a check about
+    # the thrust curve for a reason that has nothing to do with the thrust
+    # curve. Exclude them, but say how many, because "every env died on step
+    # one" is itself the thing worth knowing.
+    alive = ~(terminated | truncated)
+    survivors = int(alive.sum())
     weight = plant.MASS_KG * plant.G
-    ratio = applied / weight
+    ratio = action_term._applied_thrust_n[alive] / weight
     # Each env is pinned to 1 g at *its own* hover point, so handing it the
     # client's constant should over- or under-thrust in a bounded way.
     checks.record(
-        bool(((ratio > 0.5) & (ratio < 1.6)).all()),
+        survivors > 0.9 * unwrapped.num_envs
+        and bool(((ratio > 0.5) & (ratio < 1.6)).all()),
         "zero action gives a plausible collective",
-        f"{float(ratio.min()):.3f}..{float(ratio.max()):.3f} g",
+        f"{float(ratio.min()):.3f}..{float(ratio.max()):.3f} g "
+        f"over {survivors}/{unwrapped.num_envs} envs still flying",
     )
 
     # --- latency: is the plant delaying anything at all? -------------------

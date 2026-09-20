@@ -43,7 +43,14 @@ FIVE_IN_DRONE = ArticulationCfg(
             stabilization_threshold=0.001,
         ),
         copy_from_source=False,
-        mass_props=sim_utils.MassPropertiesCfg(mass=1.745),
+        # No mass_props here, deliberately. This USD defines five rigid bodies
+        # -- the airframe plus four spinning prop links -- and
+        # MassPropertiesCfg applies its single value to every one of them, so
+        # `mass=1.745` built a 8.725 kg aircraft with thrust sized for 1.745.
+        # The mass is split across the links at startup instead, by
+        # `tasks.drone_racer.mdp.events.set_body_mass`. Any environment using
+        # this asset must run that event or it inherits the USD's authored
+        # masses, which came from a 0.5 kg upstream aircraft.
     ),
     init_state=ArticulationCfg.InitialStateCfg(
         pos=(0.0, 0.0, 0.0),

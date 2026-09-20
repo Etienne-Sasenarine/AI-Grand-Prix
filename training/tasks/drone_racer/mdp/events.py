@@ -96,6 +96,99 @@ def reset_after_prev_gate(
 # band can be switched on in one line if the A/B says otherwise.
 BODY_INERTIA_DIAG = (0.0040, 0.0055, 0.0075)
 
+# The aircraft on the scale. Must equal ``contract.plant.MASS_KG``; a test
+# parses this literal to make sure it still does.
+AIRFRAME_MASS_KG = 1.745
+
+# Mass of one propeller, and its inertia about its own centre.
+#
+# The USD defines five rigid bodies -- ``body`` plus four spinning ``propN``
+# links -- and ``MassPropertiesCfg(mass=...)`` applies its value to *every one
+# of them*. Spawning with ``mass=1.745`` therefore built a 8.725 kg aircraft
+# carrying thrust sized for 1.745 kg: a thrust-to-weight of 0.2, which cannot
+# leave the ground. Nothing in the stack noticed, because every part of it was
+# individually correct.
+#
+# 5 g is a tri-blade 5-inch prop, weighed as a class rather than this one. The
+# exact figure barely matters: the props are 1.1% of the airframe and the body
+# mass is derived from the total, so an error here moves mass between links
+# without changing what the aircraft weighs.
+#
+# Inertia is a thin planar body of that mass and 0.127 m span: I_spin = mL^2/12,
+# and the two perpendicular axes are half that. Which flat axis PhysX calls the
+# spin axis depends on how the joint was authored; at 7e-6 against the body's
+# 4e-3 the distinction is below anything the policy could feel.
+PROP_MASS_KG = 0.005
+PROP_INERTIA_DIAG = (3.4e-6, 3.4e-6, 6.7e-6)
+
+
+def set_body_mass(
+    env: ManagerBasedEnv,
+    env_ids: torch.Tensor | None,
+    total_mass_kg: float = AIRFRAME_MASS_KG,
+    prop_mass_kg: float = PROP_MASS_KG,
+    asset_cfg_name: str = "robot",
+    body_name: str = "body",
+    prop_name_expr: str = "prop.*",
+):
+    """Distribute the airframe's mass across its links, in PhysX.
+
+    ``MassPropertiesCfg`` cannot express this: it carries one number and hands
+    it to every body it spawns. So the spawn config sets no mass at all and the
+    split is made here, where the links can be told apart.
+
+    The central body is given whatever is left after the props, so the total is
+    ``total_mass_kg`` by construction rather than by three numbers happening to
+    add up. Mass is the one plant parameter that must be *right* rather than
+    randomised -- a +30% error is unrecoverable on real hardware even with
+    domain randomisation -- so it is worth the total being arithmetically
+    guaranteed instead of maintained by hand.
+
+    Run at ``startup``, and before the inertia event: PhysX's tensor API keeps
+    mass and inertia independent, but should a future version rescale inertia
+    with mass, writing inertia second means the explicit value wins.
+
+    Raises ``ValueError`` if the name patterns do not account for every rigid
+    body, since a link nobody matched would silently keep its spawn mass and
+    the total would not be the total.
+    """
+    asset: RigidObject | Articulation = env.scene[asset_cfg_name]
+    view = asset.root_physx_view
+
+    if env_ids is None:
+        env_ids = torch.arange(env.scene.num_envs, device="cpu")
+    env_ids = env_ids.cpu()
+
+    body_ids = asset.find_bodies(body_name)[0]
+    prop_ids = asset.find_bodies(prop_name_expr)[0]
+
+    # (num_instances, num_bodies)
+    masses = view.get_masses().clone()
+    num_bodies = masses.shape[1]
+    matched = set(body_ids) | set(prop_ids)
+    if len(matched) != num_bodies:
+        raise ValueError(
+            f"mass split covers {sorted(matched)} of {num_bodies} bodies in "
+            f"'{asset_cfg_name}'; every rigid body must be named by "
+            f"body_name={body_name!r} or prop_name_expr={prop_name_expr!r}, "
+            "or the airframe will not weigh what the contract says it does"
+        )
+    if len(body_ids) != 1:
+        raise ValueError(f"body_name={body_name!r} matched {len(body_ids)} bodies, expected 1")
+
+    central_mass = total_mass_kg - prop_mass_kg * len(prop_ids)
+    if central_mass <= 0.0:
+        raise ValueError(
+            f"{len(prop_ids)} props at {prop_mass_kg} kg leave "
+            f"{central_mass:.4f} kg for the airframe"
+        )
+
+    for prop_id in prop_ids:
+        masses[env_ids, prop_id] = prop_mass_kg
+    masses[env_ids, body_ids[0]] = central_mass
+
+    view.set_masses(masses, env_ids)
+
 
 def set_body_inertia(
     env: ManagerBasedEnv,
@@ -140,10 +233,19 @@ def set_body_inertia(
         scale = torch.empty(len(env_ids), 1).uniform_(lo, hi)
 
     diag = torch.tensor([[ixx, iyy, izz]], dtype=inertias.dtype) * scale
+
+    # Write all nine entries, not just the diagonal. The products of inertia
+    # are what is left over from the USD's own tensor, and the authored asset
+    # carries 4.7e-4 in them -- 12% of the roll moment we are setting, which is
+    # a genuinely different airframe: it couples roll into pitch on every
+    # input. A body whose principal axes are its body axes has none, and this
+    # one is modelled as exactly that, so they belong at zero by statement
+    # rather than by whatever the exporter happened to emit.
+    tensor = torch.zeros(len(env_ids), 9, dtype=inertias.dtype)
+    for slot, axis in enumerate((0, 4, 8)):
+        tensor[:, axis] = diag[:, slot]
+
     for body_id in body_ids:
-        # Flat positions of the 3x3 diagonal; off-diagonal terms stay zero for
-        # a body whose principal axes are the body axes.
-        for slot, axis in enumerate((0, 4, 8)):
-            inertias[env_ids, body_id, axis] = diag[:, slot]
+        inertias[env_ids, body_id] = tensor
 
     view.set_inertias(inertias, env_ids)
