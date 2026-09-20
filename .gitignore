@@ -57,3 +57,6 @@ runs/
 # and `git add` then fails with "unable to index file 'nul'".
 nul
 NUL
+
+# Shipped gate-pose weights for inference/inference.py
+!inference/best.pt
