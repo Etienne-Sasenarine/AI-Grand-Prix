@@ -63,6 +63,32 @@ PLANT_TWR_MAX = 8.0
 PLANT_TWR_RANGE = (THRUST_MAX / PLANT_HOVER_RANGE[0], PLANT_TWR_MAX)
 RATE_LIMIT = 3.2
 G = 9.80665
+
+# --- latency ----------------------------------------------------------------
+#
+# The simulator used to apply a command the instant the policy produced it. The
+# aircraft does not. Between the policy deciding and the airframe responding
+# there is an MSP frame, the flight controller's own loop, and the ESCs.
+#
+# This is not a small correction. Our own sweep took crashes from 2.6 to 55 per
+# 100 gates at 50 ms, and Sun et al. measured the same cliff independently on
+# different hardware -- 0% crashes at 10 ms, 2.7% at 30 ms, 68% at 50 ms.
+# Agilicious measured Betaflight command-to-actuation at 40 ms with a load cell.
+#
+# Expressed in policy steps, which are 1/60 s. One step is 16.7 ms.
+ACTION_DELAY_STEPS_RANGE = (0, 2)
+
+# First-order lag on the rate setpoint, seconds.
+#
+# Measured, not guessed: this flight controller runs
+# ``rc_smoothing_setpoint_cutoff = 15 Hz, fixed``. That is a bandwidth limit as
+# much as a delay -- the FC simply cannot follow a rate command that changes
+# faster than that -- and a first-order fit gives tau = 1/(2*pi*15) = 10.6 ms.
+#
+# Narrow band rather than a point: the cutoff is a known number, but where the
+# rest of the FC's filtering lands on top of it is not, and a real airframe's
+# motors add their own lag on the order of 30-40 ms for a 5-inch quad.
+RATE_TAU_S_RANGE = (0.008, 0.045)
 DEFAULT_MASS_KG = 1.745
 
 

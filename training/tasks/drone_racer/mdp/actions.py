@@ -16,10 +16,12 @@ from isaaclab.managers import ActionTerm, ActionTermCfg
 from isaaclab.utils import configclass
 
 from dynamics.rate_control import (
+    ACTION_DELAY_STEPS_RANGE,
     DEFAULT_MASS_KG,
     PLANT_HOVER_RANGE,
     PLANT_TWR_RANGE,
     RATE_LIMIT,
+    RATE_TAU_S_RANGE,
     THRUST_HOVER,
     THRUST_MAX,
     THRUST_MIN,
@@ -91,6 +93,32 @@ class ControlAction(ActionTerm):
             (self.num_envs,), float(self.cfg.hover_thrust), device=self.device
         )
         self._plant_quad_share = torch.zeros(self.num_envs, device=self.device)
+
+        # --- latency -------------------------------------------------------
+        # Raw actions are held in a ring buffer and read back this env's own
+        # delay later. A ring rather than a list so the cost does not grow with
+        # the delay, and per-env rather than global so the policy cannot learn
+        # one specific lag and rely on it.
+        lo, hi = self.cfg.action_delay_steps_range or (0, 0)
+        self._max_action_delay = int(hi)
+        self._action_queue = torch.zeros(
+            self.num_envs, self._max_action_delay + 1, 4, device=self.device
+        )
+        self._queue_head = 0
+        self._action_delay = torch.zeros(self.num_envs, dtype=torch.long, device=self.device)
+        self._env_rows = torch.arange(self.num_envs, device=self.device)
+        # Filtered rate setpoint: the flight controller's 15 Hz smoothing.
+        self._rate_filtered = torch.zeros(self.num_envs, 3, device=self.device)
+        # Ones, not zeros: reset overwrites this, but it must never be a zero
+        # if anything steps before the first reset.
+        self._rate_tau = torch.ones(self.num_envs, 1, device=self.device)
+        # Per-step blend factor, precomputed at reset because tau is constant
+        # within an episode. The exact discretisation of a first-order lag is
+        # ``1 - exp(-dt/tau)``, not ``dt/tau``: physics runs at 120 Hz and the
+        # measured FC smoothing is ~10.6 ms, so dt/tau is around 0.8 and Euler
+        # is 44% wrong there. At the fast end of the band Euler clamps to 1.0
+        # and models no smoothing at all -- the opposite of what is intended.
+        self._rate_alpha = torch.ones(self.num_envs, 1, device=self.device)
         self._plant_twr = torch.full(
             (self.num_envs,),
             float(self.cfg.max_thrust) / float(self.cfg.hover_thrust),
@@ -120,7 +148,25 @@ class ControlAction(ActionTerm):
     def has_debug_vis_implementation(self) -> bool:
         return False
 
+    def _delayed(self, actions: torch.Tensor) -> torch.Tensor:
+        """This env's command from ``action_delay`` policy steps ago.
+
+        The newest action goes in at the head; each env reads back from its own
+        offset behind it. A delay of zero reads the head and is exactly the old
+        instantaneous behaviour, so this costs nothing when latency is off.
+        """
+        if self._max_action_delay == 0:
+            return actions
+        self._queue_head = (self._queue_head + 1) % self._action_queue.shape[1]
+        self._action_queue[:, self._queue_head] = actions
+        read = (self._queue_head - self._action_delay) % self._action_queue.shape[1]
+        return self._action_queue[self._env_rows, read]
+
     def process_actions(self, actions: torch.Tensor):
+        # What the policy just asked for is not what the aircraft is doing yet.
+        # ``_raw_actions`` deliberately holds the *delayed* command, because it
+        # is what the rest of the term and the reward read as "the action".
+        actions = self._delayed(actions)
         self._raw_actions[:] = actions
         thrust_stick, rates_ned = decode_aigp_action(
             self._raw_actions,
@@ -155,8 +201,20 @@ class ControlAction(ActionTerm):
 
     def apply_actions(self):
         omega_flu = self._robot.data.root_ang_vel_b
+
+        # The flight controller does not track a rate setpoint that changes
+        # faster than its own smoothing filter -- ours measures
+        # rc_smoothing_setpoint_cutoff = 15 Hz. Modelled as a first-order lag at
+        # the physics rate, which is where the real inner loop runs too. This is
+        # a bandwidth limit, not just a delay: a step command arrives rounded
+        # off rather than merely late.
+        cmd_rates = self._cmd_rates_ned
+        if self.cfg.rate_tau_s_range is not None:
+            self._rate_filtered += self._rate_alpha * (cmd_rates - self._rate_filtered)
+            cmd_rates = self._rate_filtered
+
         moment = rate_moments(
-            self._cmd_rates_ned,
+            cmd_rates,
             omega_flu,
             self._rate_kp,
             self._rate_kd,
@@ -171,6 +229,8 @@ class ControlAction(ActionTerm):
         log(self._env, ["thr_scale"], self._thrust_scale.unsqueeze(-1))
         log(self._env, ["thr_n_applied"], self._applied_thrust_n.unsqueeze(-1))
         log(self._env, ["plant_twr"], self._plant_twr.unsqueeze(-1))
+        log(self._env, ["act_delay"], self._action_delay.unsqueeze(-1).to(self._thrust_scale.dtype))
+        log(self._env, ["rate_tau"], self._rate_tau)
 
     def reset(self, env_ids):
         if env_ids is None or len(env_ids) == self.num_envs:
@@ -214,6 +274,30 @@ class ControlAction(ActionTerm):
             self._plant_hover[env_ids], nominal_hover=self.cfg.hover_thrust
         )
 
+        # --- latency -------------------------------------------------------
+        # Clear the whole queue for these envs, not just the head. Otherwise a
+        # fresh episode spends its first few steps executing commands the
+        # *previous* episode issued -- which, with 4096 envs resetting at
+        # staggered times, is a steady trickle of nonsense the policy cannot
+        # explain and will try to learn around.
+        self._action_queue[env_ids] = 0.0
+        self._rate_filtered[env_ids] = 0.0
+        if self.cfg.action_delay_steps_range is not None:
+            lo, hi = self.cfg.action_delay_steps_range
+            self._action_delay[env_ids] = torch.randint(
+                int(lo), int(hi) + 1, (n,), device=self.device
+            )
+        if self.cfg.rate_tau_s_range is not None:
+            lo, hi = self.cfg.rate_tau_s_range
+            self._rate_tau[env_ids, 0] = torch.empty(
+                n, device=self.device, dtype=dtype
+            ).uniform_(lo, hi)
+        else:
+            self._rate_tau[env_ids, 0] = 1.0
+        self._rate_alpha[env_ids, 0] = 1.0 - torch.exp(
+            -float(self._env.physics_dt) / self._rate_tau[env_ids, 0]
+        )
+
         self._robot.reset(env_ids)
         joint_pos = self._robot.data.default_joint_pos[env_ids]
         joint_vel = self._robot.data.default_joint_vel[env_ids]
@@ -239,6 +323,18 @@ class ControlActionCfg(ActionTermCfg):
     """Episode's true hover stick, drawn uniform. ``None`` pins the plant to
     ``hover_thrust`` exactly, which is the pre-randomisation behaviour and what
     every checkpoint through ``pq_speed_best`` trained under."""
+    action_delay_steps_range: tuple[int, int] | None = ACTION_DELAY_STEPS_RANGE
+    """Policy steps between the policy deciding and the aircraft acting, drawn
+    uniform per episode. One step is 1/60 s.
+
+    ``None`` applies commands instantly, which is what every checkpoint through
+    ``pq_speed_best`` trained under and is the single largest thing the plant
+    was getting wrong: 50 ms of delay took our own stress runs from 2.6 to 55
+    crashes per 100 gates."""
+    rate_tau_s_range: tuple[float, float] | None = RATE_TAU_S_RANGE
+    """First-order lag on the rate setpoint, seconds, drawn uniform per episode.
+    Models ``rc_smoothing_setpoint_cutoff`` (15 Hz measured on our FC, about
+    10.6 ms) plus motor lag. ``None`` tracks the setpoint perfectly."""
     plant_twr_range: tuple[float, float] | None = PLANT_TWR_RANGE
     """Episode's thrust-to-weight at the ``max_thrust`` rail, drawn uniform and
     converted to a curve shape by ``quad_share_for_twr``.
