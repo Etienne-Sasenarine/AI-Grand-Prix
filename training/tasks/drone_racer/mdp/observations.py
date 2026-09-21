@@ -173,6 +173,75 @@ def target_pos_b(
     return pos_b
 
 
+def _keypoint_dropout(env, obs: torch.Tensor) -> torch.Tensor:
+    """Drop corners the way the real detector does: in bursts, not at random.
+
+    In simulation the corners are projected analytically and are always
+    detected, so the policy has never seen one blink out. On the aircraft they
+    do, constantly. Measured at a real gate on 2026-09-21 over 1345 frames,
+    a corner's visibility flips between consecutive frames **4.2%** of the
+    time, and the runner rejects any frame carrying fewer than four corners --
+    clearing its entire six-frame history when it does.
+
+    The distribution matters more than the rate. Failures arrive in bursts, not
+    independently: an independent-frames model predicts the policy would be
+    ready 9% of the time, and it was measured at 58%, because the bad frames
+    clump together and leave long clean stretches between them. Training
+    against independent dropout would therefore teach the wrong thing -- it
+    would present a hostile world with no usable runs in it.
+
+    So each corner carries a two-state Markov chain per environment,
+    parameterised by where it settles and how sticky it is:
+
+        p(visible -> dropped) = (1 - rho) * q
+        p(dropped -> visible) = (1 - rho) * (1 - q)
+
+    which gives a steady-state dropped fraction of ``q`` and a flip rate of
+    ``2 q (1 - q) (1 - rho)``.
+
+    The flip rate alone does not pin ``q`` -- it constrains only the product --
+    so ``q`` was measured separately. At the 3 m hover pose the geometry offers
+    four corners, and of the frames where a gate was found, 49% carried four
+    and 50% carried three: about half a corner missing out of four, so
+    **q ~ 0.13**. With rho = 0.81 that reproduces the measured 4.2% flip rate.
+
+    Only corners the geometry already put in frame are dropped. A corner
+    outside the frame is not a detector failure and the simulator models it
+    already, so dropping it again would double-count.
+    """
+    q = float(os.environ.get("AIGP_KP_DROP", "0.0"))
+    if q <= 0.0:
+        return obs
+    rho = float(os.environ.get("AIGP_KP_STICKY", "0.81"))
+    vis = obs[:, 16:24]
+    state = getattr(env, "_kp_dropped", None)
+    if state is None or state.shape != vis.shape or state.device != vis.device:
+        state = torch.rand(vis.shape, device=vis.device) < q
+        env._kp_dropped = state
+
+    p_drop = (1.0 - rho) * q
+    p_recover = (1.0 - rho) * (1.0 - q)
+    roll = torch.rand(vis.shape, device=vis.device)
+    state = torch.where(state, roll >= p_recover, roll < p_drop)
+    env._kp_dropped = state
+
+    # Episodes that just reset start from a fresh draw rather than inheriting
+    # the previous flight's burst.
+    episode_len = getattr(env, "episode_length_buf", None)
+    if episode_len is not None:
+        fresh = (episode_len == 0)
+        if bool(fresh.any()):
+            state[fresh] = torch.rand(
+                (int(fresh.sum()), vis.shape[1]), device=vis.device) < q
+            env._kp_dropped = state
+
+    keep = (~state).to(obs.dtype)
+    obs[:, 16:24] = vis * keep
+    # A corner that was not detected carries no position either.
+    obs[:, :16] = obs[:, :16] * keep.repeat_interleave(2, dim=-1)
+    return obs
+
+
 def aigp_race_observation(
     env: ManagerBasedRLEnv,
     command_name: str = "target",
@@ -369,6 +438,9 @@ def aigp_race_observation(
         actions=issued_actions,
         dt=float(env.step_dt),
     )
+
+    # Detector dropout, before anything downstream reads the corners.
+    obs = _keypoint_dropout(env, obs)
 
     if visual_counter is not None:
         uv = obs[:, :16].reshape(env.num_envs, 8, 2)
