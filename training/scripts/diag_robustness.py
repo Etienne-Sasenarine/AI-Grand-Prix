@@ -47,6 +47,9 @@ parser.add_argument("--steps", type=int, default=900,
                     help="at 60 Hz; rescaled with --rate so the flown time is equal")
 parser.add_argument("--rate", type=float, default=None,
                     help="policy control rate in Hz (trained at 60)")
+parser.add_argument("--pad-start", action="store_true",
+                    help="every episode begins on the competition start pad, "
+                         "targeting G1, instead of the training spawn mix")
 parser.add_argument("--kinds", default=None,
                     help="comma-separated subset of the perturbations; "
                          "'none' alone is the clean baseline")
@@ -152,6 +155,19 @@ def main() -> int:
     # Control rate. Only the policy rate moves: physics stays at 120 Hz, which
     # is the honest model of the aircraft, because Betaflight's inner loop does
     # not slow down when the companion computer does.
+    if args.pad_start:
+        # The training mix spawns mostly mid-course, next to a gate, which
+        # flatters the gates-per-episode figure badly. A competition run starts
+        # from one place, 7.8 m out from G1, and has to fly the course from
+        # there. That is the number that answers "would it qualify".
+        env_cfg.commands.target.race_start_fraction = 1.0
+        env_cfg.commands.target.floor_start_fraction = 0.0
+        pad = env_cfg.commands.target.race_start_xy
+        if pad is None:
+            raise SystemExit("this task has no race_start_xy; nothing to start from")
+        print(f"\npad start: every episode begins at {pad}, targeting Isaac gate "
+              f"{env_cfg.commands.target.race_start_idx} (official G1)", flush=True)
+
     steps = args.steps
     if args.rate is not None:
         physics_hz = 1.0 / float(env_cfg.sim.dt)
@@ -223,6 +239,7 @@ def main() -> int:
 
     hz = args.rate if args.rate is not None else 60.0
     print(f"\nROBUSTNESS checkpoint={args.checkpoint} hz={hz:g} "
+          f"pad_start={bool(args.pad_start)} "
           + " ".join(f"{k}={v:.3f}" for k, v in results.items()), flush=True)
     env.close()
     return 0

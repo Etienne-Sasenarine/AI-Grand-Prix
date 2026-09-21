@@ -16,6 +16,7 @@ import torch
 from isaaclab.assets import Articulation, RigidObject
 from isaaclab.managers import SceneEntityCfg
 
+from contract.observation import NOT_SEEN
 from utils.aigp_obs import DEFAULT_MASS_KG, build_aigp_observation
 from utils.logger import log
 
@@ -237,8 +238,19 @@ def _keypoint_dropout(env, obs: torch.Tensor) -> torch.Tensor:
 
     keep = (~state).to(obs.dtype)
     obs[:, 16:24] = vis * keep
-    # A corner that was not detected carries no position either.
-    obs[:, :16] = obs[:, :16] * keep.repeat_interleave(2, dim=-1)
+    # A corner that was not detected must carry the contract's absent
+    # sentinel, NOT_SEEN = -1.0, and not zero.
+    #
+    # Zero is a *valid on-screen position* -- the top-left of the normalised
+    # frame. Writing it makes a dropped corner teleport to the origin instead
+    # of disappearing, which is a confidently wrong position rather than a
+    # missing one, and strictly worse than the failure being modelled. The
+    # first version of this did exactly that and collapsed racing from 12.80
+    # gates per episode to 0.13.
+    dropped_uv = state.repeat_interleave(2, dim=-1)
+    obs[:, :16] = torch.where(
+        dropped_uv, torch.full_like(obs[:, :16], NOT_SEEN), obs[:, :16]
+    )
     return obs
 
 

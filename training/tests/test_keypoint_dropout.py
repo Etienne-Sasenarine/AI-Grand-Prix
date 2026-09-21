@@ -27,7 +27,7 @@ def _load():
     src = SRC.read_text()
     start = src.index("def _keypoint_dropout")
     end = src.index("def aigp_race_observation")
-    ns: dict = {"os": os, "torch": torch}
+    ns: dict = {"os": os, "torch": torch, "NOT_SEEN": -1.0}
     exec(src[start:end], ns)          # noqa: S102 - our own source, not input
     return ns["_keypoint_dropout"]
 
@@ -56,9 +56,10 @@ def _run(q: str, sticky: str, steps: int = 1500, n: int = 128):
             if prev is not None:
                 flips += float((vis != prev).float().mean())
             prev = vis
-            # A corner that was not detected carries no position either.
+            # A corner that was not detected carries the absent sentinel,
+            # NOT_SEEN = -1.0. Zero would be a valid on-screen position.
             corners = out[:, :16].reshape(n, 8, 2)
-            assert torch.all(corners[vis == 0] == 0)
+            assert torch.all(corners[vis == 0] == -1.0)
         return dropped / steps, flips / (steps - 1)
     finally:
         os.environ.pop("AIGP_KP_DROP", None)
