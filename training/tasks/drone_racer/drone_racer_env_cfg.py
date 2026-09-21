@@ -600,6 +600,33 @@ class DroneRacerEnvCfg(ManagerBasedRLEnvCfg):
         self.sim.dt = 1 / 120
         self.sim.render_interval = self.decimation
 
+        # Control rate, overridable so a policy can be trained at the rate the
+        # aircraft will actually run it. Unset, this block does nothing and the
+        # 60 Hz decimation above stands.
+        #
+        # The Jetson runner ticks at 40 Hz. Measured 2026-09-21 on
+        # race_leg1_2146.pt, the same checkpoint over the same 15 s of flying:
+        # 8.246 gates at 60 Hz against 3.086 at 40, i.e. 37% of baseline.
+        # Racing is hit far harder than hover, which keeps 60% of its settled
+        # time under the same change -- unsurprisingly, since a racer is
+        # committed to a trajectory between gates and has less room to correct
+        # a late command than a station keeper does.
+        #
+        # Only the *policy* rate moves. Physics stays at 120 Hz, which is the
+        # honest model: Betaflight's inner loop does not slow down because the
+        # companion computer does.
+        hz = os.environ.get("AIGP_POLICY_HZ")
+        if hz:
+            physics_hz = 1.0 / float(self.sim.dt)
+            decimation = physics_hz / float(hz)
+            if abs(decimation - round(decimation)) > 1e-6:
+                raise ValueError(
+                    f"AIGP_POLICY_HZ={hz} needs a whole decimation of the "
+                    f"{physics_hz:g} Hz physics tick; got {decimation:.4f}"
+                )
+            self.decimation = int(round(decimation))
+            self.sim.render_interval = self.decimation
+
 
 @configclass
 class DroneRacerEnvCfg_PLAY(ManagerBasedRLEnvCfg):
