@@ -34,23 +34,23 @@ export PYTHONPATH="${REPO}:${PYTHONPATH:-}"
 cd "$REPO" || exit 1
 
 echo "stress sweep over: $CKPT"
-printf '\n  %-12s %9s %9s %11s %9s\n' condition survived settled median_err p95_err
+printf '\n  %-16s %9s %9s %11s %9s\n' condition survived settled median_err p95_err
 echo "  -------------------------------------------------------------"
 
 for cond in $CONDITIONS; do
-    log="${OUT}/$(echo "$cond" | tr '=.' '__').log"
+    log="${OUT}/$(echo "$cond" | tr '=.,' '___').log"
     "$ISAAC_PY" scripts/stress_hover.py --headless \
         --checkpoint "$CKPT" --condition "$cond" --num_envs "$NUM_ENVS" \
         > "$log" 2>&1
 
-    line="$(grep -oE 'STRESS condition=[^ ]+ survived=[0-9.]+ settled=[0-9.]+ median_err=[0-9.]+ p95_err=[0-9.]+' "$log" | tail -1)"
+    line="$(grep -oE 'STRESS .*survived=[0-9.]+ settled=[0-9.]+ median_err=[0-9.]+ p95_err=[0-9.]+' "$log" | tail -1)"
     if [ -z "$line" ]; then
-        printf '  %-12s %9s  (no result -- see %s)\n' "$cond" FAILED "$log"
+        printf '  %-16s %9s  (no result -- see %s)\n' "$cond" FAILED "$log"
         grep -iE "error|traceback|out of memory" "$log" | tail -2
         continue
     fi
 
-    printf '  %-12s %9s %9s %11s %9s\n' "$cond" \
+    printf '  %-16s %9s %9s %11s %9s\n' "$cond" \
         "$(echo "$line" | grep -oE 'survived=[0-9.]+' | cut -d= -f2)" \
         "$(echo "$line" | grep -oE 'settled=[0-9.]+'  | cut -d= -f2)" \
         "$(echo "$line" | grep -oE 'median_err=[0-9.]+' | cut -d= -f2)" \

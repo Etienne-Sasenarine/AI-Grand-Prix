@@ -43,7 +43,13 @@ parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("--task", default="Isaac-Drone-Racer-v0")
 parser.add_argument("--checkpoint", required=True)
 parser.add_argument("--num_envs", type=int, default=256)
-parser.add_argument("--steps", type=int, default=900)
+parser.add_argument("--steps", type=int, default=900,
+                    help="at 60 Hz; rescaled with --rate so the flown time is equal")
+parser.add_argument("--rate", type=float, default=None,
+                    help="policy control rate in Hz (trained at 60)")
+parser.add_argument("--kinds", default=None,
+                    help="comma-separated subset of the perturbations; "
+                         "'none' alone is the clean baseline")
 parser.add_argument("--ml_framework", default="torch")
 AppLauncher.add_app_launcher_args(parser)
 args, hydra_args = parser.parse_known_args()
@@ -142,6 +148,28 @@ def perturb(frames: torch.Tensor, kind: str, gen: torch.Generator) -> torch.Tens
 
 def main() -> int:
     env_cfg = parse_env_cfg(args.task, device=args.device, num_envs=args.num_envs)
+
+    # Control rate. Only the policy rate moves: physics stays at 120 Hz, which
+    # is the honest model of the aircraft, because Betaflight's inner loop does
+    # not slow down when the companion computer does.
+    steps = args.steps
+    if args.rate is not None:
+        physics_hz = 1.0 / float(env_cfg.sim.dt)
+        decimation = physics_hz / args.rate
+        if abs(decimation - round(decimation)) > 1e-6:
+            raise SystemExit(
+                f"--rate {args.rate:g} needs a whole decimation of the "
+                f"{physics_hz:g} Hz physics tick; got {decimation:.4f}"
+            )
+        env_cfg.decimation = int(round(decimation))
+        env_cfg.sim.render_interval = env_cfg.decimation
+        # Gates per episode is a rate over time, so the window has to be the
+        # same number of seconds at both rates or the comparison is a count of
+        # steps rather than a measure of flying.
+        steps = int(round(args.steps * args.rate / 60.0))
+        print(f"\ncontrol rate {args.rate:g} Hz (decimation {env_cfg.decimation}, "
+              f"trained at 60); {steps} steps = {steps / args.rate:.1f} s", flush=True)
+
     env = gym.make(args.task, cfg=env_cfg)
     unwrapped = env.unwrapped
 
@@ -164,6 +192,12 @@ def main() -> int:
 
     KINDS = ["none", "gate_shift", "gate_zero", "kp_noise", "kp_dropout",
              "gyro_noise", "att_noise", "stale_frame"]
+    if args.kinds:
+        wanted = [k for k in args.kinds.split(",") if k]
+        unknown = [k for k in wanted if k not in KINDS]
+        if unknown:
+            raise SystemExit(f"unknown perturbation(s): {', '.join(unknown)}")
+        KINDS = wanted
     results = {}
 
     for kind in KINDS:
@@ -171,7 +205,7 @@ def main() -> int:
         obs, _ = wrapped.reset()
         passed = 0
         with torch.inference_mode():
-            for _ in range(args.steps):
+            for _ in range(steps):
                 frames = obs.view(args.num_envs, obs_contract.HISTORY, frame_dim)
                 a = runner.agent.act(
                     perturb(frames, kind, gen).view(args.num_envs, width),
@@ -187,8 +221,9 @@ def main() -> int:
         print(f"  {kind:<13} {per_env:7.3f} gates/env   {rel:6.1%} of baseline",
               flush=True)
 
-    print("\nROBUSTNESS " + " ".join(f"{k}={v:.3f}" for k, v in results.items()),
-          flush=True)
+    hz = args.rate if args.rate is not None else 60.0
+    print(f"\nROBUSTNESS checkpoint={args.checkpoint} hz={hz:g} "
+          + " ".join(f"{k}={v:.3f}" for k, v in results.items()), flush=True)
     env.close()
     return 0
 

@@ -13,6 +13,8 @@ for closing distance; this pays for being parked in front of it and still.
 
 from __future__ import annotations
 
+import os
+
 from isaaclab.managers import RewardTermCfg as RewTerm
 from isaaclab.managers import SceneEntityCfg
 from isaaclab.managers import TerminationTermCfg as DoneTerm
@@ -194,6 +196,33 @@ class DroneHoverEnvCfg(DroneRacerEnvCfg):
         # but not identical every time, or the policy learns one trajectory
         # instead of a controller.
         self.commands.target.spawn_scatter_m = (0.8, 0.8, 0.0)
+
+        # Control rate, overridable so a rate-matched policy can be trained
+        # without forking the task.
+        #
+        # The deployed runner ticks at 40 Hz and this policy trains at 60, and
+        # measured on 2026-09-20 that mismatch is expensive: settled fell from
+        # 87.0% to 52.6% and the p95 excursion went 0.37 m -> 0.93 m. Pinning
+        # the delay line off separates the two causes -- 88.7% -> 66.1% is the
+        # rate itself, the remaining 66.1% -> 52.6% is the extra latency a
+        # slower loop brings. Two thirds of the damage is the rate, so no
+        # amount of latency engineering recovers it: the policy has to be
+        # trained at the rate it will fly, or flown at the rate it trained.
+        #
+        # Only the *policy* rate moves. Physics stays at 120 Hz, which is the
+        # honest model -- Betaflight's inner loop does not slow down because
+        # the companion computer does.
+        hz = os.environ.get("AIGP_HOVER_HZ")
+        if hz:
+            physics_hz = 1.0 / float(self.sim.dt)
+            decimation = physics_hz / float(hz)
+            if abs(decimation - round(decimation)) > 1e-6:
+                raise ValueError(
+                    f"AIGP_HOVER_HZ={hz} needs a whole decimation of the "
+                    f"{physics_hz:g} Hz physics tick; got {decimation:.4f}"
+                )
+            self.decimation = int(round(decimation))
+            self.sim.render_interval = self.decimation
 
 
 @configclass

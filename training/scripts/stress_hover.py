@@ -23,6 +23,11 @@ number:
     delay=<n>        action delay pinned to n policy steps, beyond the trained 0-2
     tau=<s>          rate-filter time constant pinned to s, beyond the trained band
     wind=<n>         constant lateral force of n newtons
+    rate=<hz>        policy control rate changed from the trained 60 Hz
+
+Conditions may be combined with commas -- ``rate=40,delay=0`` runs at 40 Hz
+with the delay line pinned off, which isolates the control rate from the
+latency that a slower loop also brings.
 
 What it reports, and why these:
 
@@ -46,8 +51,9 @@ parser.add_argument("--task", default="Isaac-Drone-Hover-v0")
 parser.add_argument("--checkpoint", required=True)
 parser.add_argument("--condition", default="nominal")
 parser.add_argument("--num_envs", type=int, default=512)
-parser.add_argument("--steps", type=int, default=900, help="one 15 s episode at 60 Hz")
-parser.add_argument("--settle_steps", type=int, default=180,
+parser.add_argument("--seconds", type=float, default=15.0,
+                    help="flown per episode; converted to steps at the policy rate")
+parser.add_argument("--settle_seconds", type=float, default=3.0,
                     help="discarded before scoring; the policy is still arriving")
 parser.add_argument("--ml_framework", default="torch")
 AppLauncher.add_app_launcher_args(parser)
@@ -71,6 +77,14 @@ from tasks.drone_hover.mdp.rewards import hold_point  # noqa: E402
 
 
 def apply_condition(env_cfg, condition: str) -> str:
+    """Mutate the config for one or more comma-separated conditions."""
+    parts = [p for p in condition.split(",") if p]
+    if len(parts) > 1:
+        return "; ".join(apply_one(env_cfg, p) for p in parts)
+    return apply_one(env_cfg, condition)
+
+
+def apply_one(env_cfg, condition: str) -> str:
     """Mutate the config for one condition. Returns a human description."""
     if condition == "nominal":
         return "training distribution (control)"
@@ -112,6 +126,27 @@ def apply_condition(env_cfg, condition: str) -> str:
         env_cfg.events.push_robot.interval_range_s = (0.0, 0.0)
         return f"steady lateral force {value:g} N"
 
+    if name == "rate":
+        # Only the *policy* rate moves. The rate controller and the plant stay
+        # on the 120 Hz physics tick, which is the right model of the real
+        # aircraft: Betaflight's inner loop does not slow down because our
+        # companion computer does. Three things change at once, and that is
+        # the point -- it is what actually happens on the Jetson:
+        #   * each action is held 1.5x longer at 40 Hz,
+        #   * the 6-frame observation history spans 150 ms instead of 100,
+        #   * the delay line, counted in policy steps, grows in milliseconds.
+        # Pin ``delay`` alongside this to separate the last one from the rest.
+        physics_hz = 1.0 / float(env_cfg.sim.dt)
+        decimation = physics_hz / value
+        if abs(decimation - round(decimation)) > 1e-6:
+            raise SystemExit(
+                f"rate={value:g} Hz needs a whole decimation of the "
+                f"{physics_hz:g} Hz physics tick; got {decimation:.4f}"
+            )
+        env_cfg.decimation = int(round(decimation))
+        env_cfg.sim.render_interval = env_cfg.decimation
+        return f"policy rate {value:g} Hz (decimation {env_cfg.decimation}, trained at 60)"
+
     raise SystemExit(f"unknown condition '{name}'")
 
 
@@ -119,8 +154,17 @@ def main() -> int:
     env_cfg = parse_env_cfg(args.task, device=args.device, num_envs=args.num_envs)
     description = apply_condition(env_cfg, args.condition)
 
-    print(f"\ncondition: {args.condition}", flush=True)
+    # After the condition, because ``rate`` moves it. Scoring the same number
+    # of *steps* at two rates would compare two different durations.
+    policy_hz = 1.0 / (float(env_cfg.sim.dt) * int(env_cfg.decimation))
+    steps = int(round(args.seconds * policy_hz))
+    settle_steps = int(round(args.settle_seconds * policy_hz))
+
+    print(f"\ncheckpoint: {args.checkpoint}", flush=True)
+    print(f"condition: {args.condition}", flush=True)
     print(f"           {description}", flush=True)
+    print(f"           {policy_hz:.1f} Hz, {steps} steps "
+          f"({args.seconds:g} s), scoring after {settle_steps}", flush=True)
 
     env = gym.make(args.task, cfg=env_cfg)
     unwrapped = env.unwrapped
@@ -149,12 +193,12 @@ def main() -> int:
     robot = unwrapped.scene["robot"]
 
     with torch.inference_mode():
-        for step in range(args.steps):
+        for step in range(steps):
             actions = runner.agent.act(obs, timestep=0, timesteps=0)[0]
             obs, _, terminated, truncated, _ = wrapped.step(actions)
             ever_terminated |= terminated.squeeze(-1).bool()
 
-            if step < args.settle_steps:
+            if step < settle_steps:
                 continue
 
             target = hold_point(unwrapped, "target", standoff_m=STANDOFF_M)
@@ -176,7 +220,8 @@ def main() -> int:
 
     # One machine-readable line, because Isaac's hard exit makes the status
     # code worthless and a driver script needs something to grep.
-    print(f"STRESS condition={args.condition} survived={survived:.4f} "
+    print(f"STRESS checkpoint={args.checkpoint} "
+          f"condition={args.condition} hz={policy_hz:.1f} survived={survived:.4f} "
           f"settled={settled:.4f} median_err={float(all_err.median()):.4f} "
           f"p95_err={float(all_err.quantile(0.95)):.4f}", flush=True)
 
