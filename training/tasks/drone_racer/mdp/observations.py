@@ -16,6 +16,7 @@ import torch
 from isaaclab.assets import Articulation, RigidObject
 from isaaclab.managers import SceneEntityCfg
 
+from contract.camera import FRAME_H, FRAME_W
 from contract.observation import NOT_SEEN
 from utils.aigp_obs import DEFAULT_MASS_KG, build_aigp_observation
 from utils.logger import log
@@ -254,6 +255,60 @@ def _keypoint_dropout(env, obs: torch.Tensor) -> torch.Tensor:
     return obs
 
 
+def _keypoint_jitter(env, obs: torch.Tensor) -> torch.Tensor:
+    """Move each detected corner by a small random amount, as the detector does.
+
+    In simulation a corner is projected analytically and lands exactly where the
+    geometry says. The detector does not: it regresses a keypoint from pixels,
+    and the answer moves frame to frame even with the aircraft and the gate both
+    still. The policy has therefore never had to tell a corner it can trust from
+    one it cannot, because every corner it has ever seen was exact.
+
+    This matters more than its size suggests, for the reason recorded in
+    ``pq/flight/onboard/DEPLOYMENT.md``: the runner treats visibility as truth.
+    A corner that is *present but wrong* is worse than a missing one, because
+    nothing downstream discounts it. Dropout teaches the policy to cope with
+    absence; only jitter teaches it to cope with a confident lie.
+
+    Noise is independent per corner per frame and Gaussian, in pixels at the
+    contract's 640x360 frame, converted to the normalised units the observation
+    carries. Only corners the geometry put in frame are moved: an absent corner
+    carries NOT_SEEN, which is a sentinel and not a position, and adding noise
+    to it would turn "not seen" into a plausible location near the top-left.
+
+    **The magnitude is not calibrated.** ``AIGP_KP_JITTER_PX`` defaults to 0, so
+    this is off unless asked for. The measurement that would set it is frame to
+    frame corner displacement on a static gate, which the 1345-frame comparison
+    set already contains -- run ``deploy/orin/live_compare.py --stats-log``
+    against a stationary aircraft and take the standard deviation of each
+    corner's position. Until that is done, any value here is an assumption and
+    should be written in the run's config as one.
+
+    Two things deliberately not modelled, because nothing measures them yet:
+    a systematic per-viewpoint bias (a detector is usually wrong in a
+    consistent direction for a given pose, not randomly), and the correlation
+    between jitter and confidence, where corners near the 0.25 threshold are
+    presumably noisier than the ones in clear view.
+    """
+    sigma_px = float(os.environ.get("AIGP_KP_JITTER_PX", "0.0"))
+    if sigma_px <= 0.0:
+        return obs
+
+    uv = obs[:, :16]
+    # A present corner is normalised to [0, 1]; an absent one carries
+    # NOT_SEEN = -1.0. The test is therefore the sign, not a tolerance.
+    seen = uv >= 0.0
+    # Pixels at 640x360 -> the normalised units the contract carries. The two
+    # axes differ, so the same pixel error is a larger fraction of v than of u.
+    scale = torch.tensor(
+        [sigma_px / FRAME_W, sigma_px / FRAME_H], device=uv.device, dtype=uv.dtype
+    ).repeat(8)
+    noise = torch.randn(uv.shape, device=uv.device, dtype=uv.dtype) * scale
+    moved = torch.clamp(uv + noise, 0.0, 1.0)
+    obs[:, :16] = torch.where(seen, moved, uv)
+    return obs
+
+
 def aigp_race_observation(
     env: ManagerBasedRLEnv,
     command_name: str = "target",
@@ -451,8 +506,11 @@ def aigp_race_observation(
         dt=float(env.step_dt),
     )
 
-    # Detector dropout, before anything downstream reads the corners.
+    # Detector error, before anything downstream reads the corners. Order
+    # matters: jitter only moves corners that are still present, so dropping
+    # first means a dropped corner is never nudged away from its sentinel.
     obs = _keypoint_dropout(env, obs)
+    obs = _keypoint_jitter(env, obs)
 
     if visual_counter is not None:
         uv = obs[:, :16].reshape(env.num_envs, 8, 2)
