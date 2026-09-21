@@ -2,7 +2,7 @@
 
 import gymnasium as gym
 
-from tasks.drone_racer import agents
+from . import agents  # hover has its own PPO settings; see agents/skrl_cfg.yaml
 
 gym.register(
     id="Isaac-Drone-Hover-v0",
