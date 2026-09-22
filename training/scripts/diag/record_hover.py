@@ -12,7 +12,7 @@ Speed is baked into the frame count rather than declared in the header: a
 container stamped with an unusual fps is played at whatever rate the player
 feels like, and the speed-up silently does not happen.
 
-    python scripts/record_hover.py --headless --enable_cameras --checkpoint <path>
+    python scripts/diag/record_hover.py --headless --enable_cameras --checkpoint <path>
 """
 
 from __future__ import annotations

@@ -29,7 +29,7 @@ measures what each one costs:
 Each is applied as a *standing condition* across the history, not a one-off
 glitch, because that is what a drifted counter or a noisy sensor actually is.
 
-    python scripts/diag_robustness.py --headless --checkpoint <path>
+    python scripts/diag/diag_robustness.py --headless --checkpoint <path>
 """
 
 from __future__ import annotations

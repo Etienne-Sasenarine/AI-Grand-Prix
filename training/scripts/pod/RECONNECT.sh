@@ -1,7 +1,7 @@
 #!/bin/bash
-# Run this when the laptop is back online. One command, no arguments.
+# Run this when the laptop is back online. One command, two env vars.
 #
-#     bash ~/dev/aigp-sim/scripts/pod/RECONNECT.sh
+#     POD_HOST=<ip> POD_PORT=<port> bash ~/dev/aigp-sim/scripts/pod/RECONNECT.sh
 #
 # Prints what happened while you were away, then retrieves the results bundle.
 # Safe to run repeatedly, and safe to run before the pipeline has finished --
@@ -9,8 +9,13 @@
 
 set -u
 
-POD_HOST="${POD_HOST:-195.26.233.93}"
-POD_PORT="${POD_PORT:-35432}"
+# The pod's address changes every time it restarts, so it is not baked in:
+#
+#     POD_HOST=195.26.233.93 POD_PORT=35432 bash scripts/pod/RECONNECT.sh
+#
+# (those were the values on 2026-09-21; RunPod's console shows the current ones)
+POD_HOST="${POD_HOST:?set POD_HOST to the pod's SSH address}"
+POD_PORT="${POD_PORT:?set POD_PORT to the pod's SSH port}"
 POD_KEY="${POD_KEY:-$HOME/.ssh/runpod_aigp}"
 LOCAL_DIR="${LOCAL_DIR:-$HOME/dev/aigp-runs}"
 

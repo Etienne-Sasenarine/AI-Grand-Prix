@@ -10,8 +10,8 @@ interpreter does not give a second clean measurement -- Isaac keeps working on
 a stage that still holds the first, and the numbers come out of a dirty card.
 ``scripts/pod/stress_sweep.sh`` drives the conditions in a loop.
 
-    python scripts/stress_hover.py --headless --checkpoint <path> --condition nominal
-    python scripts/stress_hover.py --headless --checkpoint <path> --condition mass=1.20
+    python scripts/diag/stress_hover.py --headless --checkpoint <path> --condition nominal
+    python scripts/diag/stress_hover.py --headless --checkpoint <path> --condition mass=1.20
 
 Conditions, all chosen to be *plausible* rather than extreme -- the point is
 to predict the cage test, not to find the breaking point of an arbitrary

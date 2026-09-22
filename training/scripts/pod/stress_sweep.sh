@@ -39,7 +39,7 @@ echo "  -------------------------------------------------------------"
 
 for cond in $CONDITIONS; do
     log="${OUT}/$(echo "$cond" | tr '=.,' '___').log"
-    "$ISAAC_PY" scripts/stress_hover.py --headless \
+    "$ISAAC_PY" scripts/diag/stress_hover.py --headless \
         --checkpoint "$CKPT" --condition "$cond" --num_envs "$NUM_ENVS" \
         > "$log" 2>&1
 

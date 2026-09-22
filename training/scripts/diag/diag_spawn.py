@@ -8,7 +8,7 @@ position out of the simulation immediately after a reset and look.
 Read *before* stepping. Reset has already placed the aircraft; one step and the
 terminated envs have been respawned underneath the numbers.
 
-    python scripts/diag_spawn.py --headless --num_envs 256
+    python scripts/diag/diag_spawn.py --headless --num_envs 256
 """
 
 from __future__ import annotations

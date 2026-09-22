@@ -15,7 +15,7 @@ where the aircraft was and classify it. Classification is by position rather
 than by contact filtering, because the sensor reports a net force per body and
 not what the body touched.
 
-    python scripts/diag_collisions.py --headless --checkpoint <path>
+    python scripts/diag/diag_collisions.py --headless --checkpoint <path>
 
 Reports the split, plus the state at impact -- height, speed, and distance to
 the gate it was aiming at -- because "hit a gate at 2 m/s while centred" and
@@ -40,6 +40,8 @@ parser.add_argument("--ground_z", type=float, default=0.35,
 parser.add_argument("--gate_r", type=float, default=1.5,
                     help="within this of a gate centre counts as gate contact")
 parser.add_argument("--ml_framework", default="torch")
+parser.add_argument("--out", default="/workspace/logs/crash_xy.json",
+                    help="where to write the impact coordinates (JSON)")
 AppLauncher.add_app_launcher_args(parser)
 args, hydra_args = parser.parse_known_args()
 sys.argv = [sys.argv[0]] + hydra_args
@@ -175,12 +177,14 @@ def main() -> int:
     import json
     xs = torch.cat([h for h in xy_x]).tolist()
     ys = torch.cat([h for h in xy_y]).tolist()
-    with open("/workspace/logs/crash_xy.json", "w") as fh:
+    import os
+    os.makedirs(os.path.dirname(os.path.abspath(args.out)) or ".", exist_ok=True)
+    with open(args.out, "w") as fh:
         json.dump({"x": [round(v, 2) for v in xs],
                    "y": [round(v, 2) for v in ys],
                    "z": [round(float(v), 2) for v in z.tolist()],
                    "speed": [round(float(v), 2) for v in v.tolist()]}, fh)
-    print(f"wrote /workspace/logs/crash_xy.json ({len(xs)} points)", flush=True)
+    print(f"wrote {args.out} ({len(xs)} points)", flush=True)
 
     print(f"\nCOLLISION_SPLIT ground={float(is_ground.float().mean()):.3f} "
           f"gate={float(is_gate.float().mean()):.3f} "

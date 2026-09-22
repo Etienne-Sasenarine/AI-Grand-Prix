@@ -406,7 +406,7 @@ class GateTargetingCommand(CommandTerm):
             #
             # Nothing warns when a tensor stops aliasing. The check that does
             # is reading the position back out of the simulation, which is what
-            # scripts/diag_spawn.py exists to do.
+            # scripts/diag/diag_spawn.py exists to do.
             gate_w = torch.cat([gate_positions, gate_orientations], dim=1)
 
             spawn_pos = gate_positions + math_utils.quat_apply(

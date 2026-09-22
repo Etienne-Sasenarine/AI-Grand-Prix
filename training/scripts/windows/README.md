@@ -1,10 +1,8 @@
-One-click Windows play. Requires `D:\isaacsim_venv` and the NVIDIA Vulkan ICD
-pin (see `ISAACSIM.md` at the repo root).
+# Windows
 
-```powershell
-cd D:\Code\Competitions\AIGP\isaac_drone_racer
-.\scripts\windows\launch_play_pq_speed.ps1
-```
+`launch_play.ps1` opens a checkpoint in the Isaac GUI from PowerShell:
 
-`launch_play_pq_speed.ps1` is the keeper. The other `launch_play_*.ps1` files
-are older checkpoints still under `models/`.
+    .\scripts\windows\launch_play.ps1 -Checkpoint <path-to-best_agent.pt>
+
+It takes `-GateLookahead` and `-SeparateNets` for older checkpoints that were
+trained with those set. Training itself runs on Linux (`docs/RUNBOOK_RUNPOD.md`).

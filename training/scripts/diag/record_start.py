@@ -23,7 +23,7 @@ got them wrong and produced a confident, wrong answer:
 
 Isaac's exit code is meaningless. The RECORDED= line is the result.
 
-    python scripts/record_start.py --headless --enable_cameras \
+    python scripts/diag/record_start.py --headless --enable_cameras \
         --checkpoint <path> --attempts 5 --attempt_steps 480 --speed 3
 """
 

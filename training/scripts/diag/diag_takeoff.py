@@ -19,7 +19,7 @@ works at all:
      contain it -- but "should" is what put the drone 47 cm underground earlier
      today, so it gets measured from the observation the policy actually reads.
 
-    python scripts/diag_takeoff.py --headless --checkpoint <path>
+    python scripts/diag/diag_takeoff.py --headless --checkpoint <path>
 """
 
 from __future__ import annotations
