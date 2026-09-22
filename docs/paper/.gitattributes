@@ -1,0 +1,4 @@
+# Paper figures are ordinary files, not LFS objects, so GitHub renders them inline.
+*.png -filter -diff -merge
+*.jpg -filter -diff -merge
+*.pdf -filter -diff -merge
