@@ -371,5 +371,7 @@ class ControlActionCfg(ActionTermCfg):
     """PD D gains on measured FLU rate, N·m / (rad/s)."""
     moment_limit: tuple[float, float, float] = MOMENT_LIMIT
     """Saturate body moments (N·m). Yaw is usable, not a leftover motor-mix leftover."""
-    # Kept so old Hydra overrides (`use_motor_model=False`) still parse.
+    # No motor model exists any more (dynamics/motor.py and allocation.py were
+    # removed unused); the field is kept only so old Hydra overrides
+    # (`use_motor_model=False`) still parse.
     use_motor_model: bool = False

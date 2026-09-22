@@ -23,10 +23,7 @@ import pytest
 # Modules that cannot even be imported without Isaac Sim present.
 # Paths are relative to this file, which is the repo root.
 _NEEDS_ISAAC = (
-    "tests/test_dynamics.py",
-    "tests/test_gate_counter_torch.py",
     "tests/test_miss_and_dive.py",
-    "tests/test_speed_cap.py",
 )
 
 

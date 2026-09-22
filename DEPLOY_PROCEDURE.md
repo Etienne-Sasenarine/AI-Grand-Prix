@@ -184,7 +184,7 @@ with `AttributeError: 'NoneType' object has no attribute 'shape'`.
 ```bash
 cd /workspace/isaaclab
 ./isaaclab.sh -p -m pip install "skrl==1.4.2" pandas pytest
-cd /workspace/aigp-sim && ./..../isaaclab.sh -p -m pip install -e . --no-deps
+cd /workspace/aigp-sim && /workspace/isaaclab/isaaclab.sh -p -m pip install -e . --no-deps
 python -c "import tasks"     # must succeed; pip's exit code is not enough
 ```
 

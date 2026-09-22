@@ -7,10 +7,16 @@ from pathlib import Path
 
 import torch
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+import pytest
 
-from gate_counter import VisualGateCounter
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from utils.flight_repo import add_to_sys_path  # noqa: E402
+
+if add_to_sys_path("gate_counter.py") is None:
+    pytest.skip("flight repo (ai-grand-prix) not found; set AIGP_FLIGHT_REPO", allow_module_level=True)
+
+from gate_counter import VisualGateCounter  # noqa: E402
 from utils.gate_counter import TorchVisualGateCounter, lock_metrics_torch
 
 

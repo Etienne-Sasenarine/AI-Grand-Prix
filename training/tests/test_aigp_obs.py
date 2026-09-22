@@ -264,10 +264,10 @@ def test_build_aigp_observation_shape_with_context():
 
 def test_commanded_velocity_matches_aigp_integrator():
     """Torch integrator must track AI_GP BodyVelocityIntegrator on the same inputs."""
-    aigp_root = Path(__file__).resolve().parents[2] / "AI_GP"
-    if not (aigp_root / "ekf" / "commanded_accel.py").is_file():
-        pytest.skip("AI_GP commanded_accel not found")
-    sys.path.insert(0, str(aigp_root))
+    from utils.flight_repo import add_to_sys_path
+
+    if add_to_sys_path("ekf/commanded_accel.py") is None:
+        pytest.skip("flight repo ekf/commanded_accel.py not found; set AIGP_FLIGHT_REPO")
     from ekf.commanded_accel import BodyVelocityIntegrator  # noqa: WPS433
 
     from utils.aigp_obs import G, CommandedBodyVelocity
@@ -351,10 +351,10 @@ def test_object_points_match_aigp_rings():
 
 def test_matches_aigp_build_observation_when_available():
     """Cross-check packing against AI_GP/race_obs.build_observation if present."""
-    aigp_root = Path(__file__).resolve().parents[2] / "AI_GP"
-    if not (aigp_root / "race_obs.py").is_file():
-        pytest.skip("AI_GP/race_obs.py not found")
-    sys.path.insert(0, str(aigp_root))
+    from utils.flight_repo import add_to_sys_path
+
+    if add_to_sys_path("race_obs.py") is None:
+        pytest.skip("flight repo race_obs.py not found; set AIGP_FLIGHT_REPO")
     import race_obs  # noqa: WPS433
 
     pts = [[100.0 + 10 * i, 50.0 + 5 * i] for i in range(8)]

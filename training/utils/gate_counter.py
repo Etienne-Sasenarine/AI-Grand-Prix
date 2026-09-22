@@ -6,14 +6,15 @@ Training at 4096 envs cannot loop that in Python every 60 Hz step, so
 """
 from __future__ import annotations
 
-import sys
-from pathlib import Path
-
 import torch
 
-_root = Path(__file__).resolve().parents[2]
-if str(_root) not in sys.path:
-    sys.path.insert(0, str(_root))
+from utils.flight_repo import add_to_sys_path
+
+if add_to_sys_path("gate_counter.py") is None:
+    raise ImportError(
+        "the flight repo's gate_counter.py was not found; set AIGP_FLIGHT_REPO "
+        "to the ai-grand-prix checkout (see utils/flight_repo.py)"
+    )
 
 from gate_counter import (  # noqa: E402
     CLOSE_SPAN,

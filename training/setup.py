@@ -23,8 +23,8 @@ INSTALL_REQUIRES = [
 
 # Installation operation
 setup(
-    name="isaac_drone_racer",
-    packages=find_packages(),
+    name="aigp-sim",
+    packages=find_packages(include=["contract*", "tasks*", "utils*", "dynamics*", "assets*"]),
     author=EXTENSION_TOML_DATA["package"]["author"],
     maintainer=EXTENSION_TOML_DATA["package"]["maintainer"],
     url=EXTENSION_TOML_DATA["package"]["repository"],

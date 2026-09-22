@@ -7,11 +7,11 @@ version = "0.1.0"
 category = "isaaclab"
 readme  = "README.md"
 
-title = "Isaac Drone Racer"
-author = "Kousheek Chakraborty"
-maintainer = "Kousheek Chakraborty"
-description="Isaac Drone Racer framework for RL based drone racing with IsaacLab"
-repository = "https://github.com/kousheekc/isaac_drone_racer"
+title = "aigp-sim"
+author = "Bojro Das, from Kousheek Chakraborty's isaac_drone_racer"
+maintainer = "Bojro Das"
+description="Isaac Lab PPO training stack for the AI Grand Prix physical qualifier"
+repository = "https://github.com/bojro/aigp-sim"
 keywords = ["isaaclab", "drone", "rl"]
 
 [dependencies]
@@ -22,8 +22,10 @@ keywords = ["isaaclab", "drone", "rl"]
 "isaaclab_tasks" = {}
 # NOTE: Add additional dependencies here
 
+# The gym ids are registered by importing this package; there is no module
+# named isaac_drone_racer here (the upstream name this file inherited).
 [[python.module]]
-name = "isaac_drone_racer"
+name = "tasks"
 
 [isaaclab_settings]
 # TODO: Uncomment and list any apt dependencies here.

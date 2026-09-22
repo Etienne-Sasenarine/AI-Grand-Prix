@@ -24,17 +24,7 @@ from contract import camera, observation, plant, verify
 
 # --- locating the flight repo ----------------------------------------------
 
-_FLIGHT_CANDIDATES = (
-    Path.home() / "dev" / "ai-grand-prix",
-    Path(__file__).resolve().parents[2] / "ai-grand-prix",
-)
-
-
-def _flight_repo() -> Path | None:
-    for path in _FLIGHT_CANDIDATES:
-        if (path / "race_obs.py").is_file():
-            return path
-    return None
+from utils.flight_repo import find as _flight_repo  # noqa: E402
 
 
 def _load_flight_module(name: str):

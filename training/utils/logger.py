@@ -12,7 +12,6 @@ from datetime import datetime
 
 import torch
 
-from utils.plotter import generate_plots
 
 
 class CSVLogger:
@@ -77,6 +76,10 @@ class CSVLogger:
         # Ensure the current file is saved (already handled by the log method)
         if not self.file_initialized:
             raise RuntimeError("No file has been initialized yet. Log some data first.")
+
+        # Lazy: plotter needs matplotlib, pandas, scipy and scienceplots, none of
+        # which the training loop needs just to write a CSV.
+        from utils.plotter import generate_plots
 
         generate_plots(self.file_path)
         # Generate a new file name with a timestamp
