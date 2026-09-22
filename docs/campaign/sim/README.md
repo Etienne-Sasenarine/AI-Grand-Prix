@@ -34,12 +34,13 @@ every value both ends must agree on:
 ```python
 from contract import observation, verify
 
-observation.observation_dim("v1")   # 1632
-verify.short_hash()                 # 'a3f9c21e4b07'
-verify.check(checkpoint["contract_hash"])   # raises on mismatch
+observation.observation_dim("v2")   # 1760
+verify.short_hash("v2")             # 'a20c14d6a335'
+verify.check_run_dir(run_dir)       # raises ContractMismatch on drift
 ```
 
-Checkpoints record the hash they trained under. Loading refuses on mismatch.
+`train.py` writes `contract.json` into every run directory beside `params/`,
+and `play.py` refuses a checkpoint whose stamp disagrees with the running code.
 To change the contract deliberately: change it here, let the hash move, retrain.
 That cost is the point — it is what stops it moving by accident.
 

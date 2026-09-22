@@ -184,6 +184,18 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     dump_yaml(os.path.join(log_dir, "params", "agent.yaml"), agent_cfg)
     dump_pickle(os.path.join(log_dir, "params", "env.pkl"), env_cfg)
     dump_pickle(os.path.join(log_dir, "params", "agent.pkl"), agent_cfg)
+    # Record which observation contract this run trains under, beside the
+    # checkpoints, so play.py (and whoever exports to the aircraft) can refuse
+    # a policy whose channels no longer mean what the code builds. Written
+    # before training so a run killed mid-way still carries it. Never fatal:
+    # a failed stamp must not cost a training run.
+    try:
+        from contract import verify as _contract_verify
+
+        stamp_path = _contract_verify.write_stamp(log_dir)
+        print(f"[INFO] Contract {_contract_verify.short_hash(_contract_verify.version_from_env())} stamped to {stamp_path}")
+    except Exception as exc:  # noqa: BLE001
+        print(f"[WARN] could not write contract stamp: {exc!r}")
 
     # get checkpoint path (to resume training)
     resume_path = retrieve_file_path(args_cli.checkpoint) if args_cli.checkpoint else None

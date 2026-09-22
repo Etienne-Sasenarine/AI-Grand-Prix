@@ -17,8 +17,8 @@ the hash it trained under, the client checks the hash it is flying under, and a
 difference is refused at load time rather than discovered at 20 m/s.
 
     >>> from contract import verify
-    >>> verify.contract_hash()[:12]      # doctest: +SKIP
-    'a3f9c21e4b07'
+    >>> verify.short_hash("v2")
+    'a20c14d6a335'
 
 To change the contract deliberately, change it here, let the hash move, and
 retrain. That is the intended cost: it is what stops it moving by accident.
@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from pathlib import Path
 from typing import Any
 
 from . import camera, observation, plant
@@ -119,3 +120,52 @@ def stamp(version: str = "v1") -> dict[str, str]:
         "contract_hash": contract_hash(version),
         "contract_summary": observation.describe(version),
     }
+
+
+# --- files beside a checkpoint ---------------------------------------------
+
+STAMP_FILENAME = "contract.json"
+
+
+def version_from_env(default: str = "v2") -> str:
+    """The observation version the env cfg will build: ``$OBS_VERSION`` or v2.
+
+    Mirrors ``tasks/drone_racer/drone_racer_env_cfg.py``, which reads the same
+    variable; kept here so the stamp and the env cannot disagree about which
+    contract a run trained under.
+    """
+    import os
+
+    return os.environ.get("OBS_VERSION", default).strip().lower() or default
+
+
+def write_stamp(run_dir: str | Path, version: str | None = None) -> Path:
+    """Write ``stamp()`` as JSON into a run directory, next to ``params/``."""
+    version = version or version_from_env()
+    path = Path(run_dir) / STAMP_FILENAME
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(stamp(version), indent=2, sort_keys=True) + "\n")
+    return path
+
+
+def read_stamp(run_dir: str | Path) -> dict[str, str] | None:
+    """The stamp a run was trained under, or ``None`` if the run has none."""
+    path = Path(run_dir) / STAMP_FILENAME
+    if not path.is_file():
+        return None
+    return json.loads(path.read_text())
+
+
+def check_run_dir(run_dir: str | Path, version: str | None = None, *, what: str = "checkpoint") -> bool:
+    """``check()`` against the stamp in ``run_dir``.
+
+    Returns ``False`` when there is no stamp (runs from before stamping
+    existed), raises :class:`ContractMismatch` on a mismatch, ``True`` when
+    the stamp agrees with this code.
+    """
+    stamped = read_stamp(run_dir)
+    if stamped is None:
+        return False
+    version = version or stamped.get("contract_version") or version_from_env()
+    check(stamped["contract_hash"], version, what=what)
+    return True

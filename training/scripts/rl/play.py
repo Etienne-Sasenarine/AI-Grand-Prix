@@ -205,6 +205,24 @@ def main():
         )
     log_dir = os.path.dirname(os.path.dirname(resume_path))
 
+    # Refuse a checkpoint whose training-time contract is not the one this
+    # code builds. Runs from before stamping carry no contract.json and are
+    # let through with a note; a stamped run that disagrees is an error.
+    from contract import verify as contract_verify
+
+    try:
+        if contract_verify.check_run_dir(log_dir, what=f"checkpoint {resume_path}"):
+            print(f"[INFO] contract.json in {log_dir} matches this code")
+        else:
+            print(f"[INFO] no contract.json in {log_dir}; run predates stamping, contract unverified")
+    except contract_verify.ContractMismatch as exc:
+        stamped = contract_verify.read_stamp(log_dir) or {}
+        raise SystemExit(
+            f"[ERROR] contract mismatch: checkpoint trained under "
+            f"{stamped.get('contract_hash', '?')[:12]} ({stamped.get('contract_version', '?')}), "
+            f"this code is {contract_verify.contract_hash(stamped.get('contract_version', 'v2'))[:12]}.\n{exc}"
+        ) from exc
+
     # create isaac environment
     env = gym.make(args_cli.task, cfg=env_cfg, render_mode="rgb_array" if args_cli.video else None)
 
