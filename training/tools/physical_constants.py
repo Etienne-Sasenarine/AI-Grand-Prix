@@ -1,4 +1,14 @@
-"""Offline worksheet/calculator for PHYSICAL_TUNING.md (standard library only).
+"""Offline worksheet for turning field measurements into plant constants.
+
+Standard library only. It never touches the aircraft and never edits source:
+it takes a JSON of measurements (hover trials, thrust burst, rate steps,
+camera calibration) and prints the constants they imply, with the file and
+symbol each one belongs to, so a person can compare them against
+``contract/plant.py`` and ``dynamics/rate_control.py``. ``docs/PLANT.md``
+describes what the plant currently assumes and which of those numbers are
+estimates; this tool is how a measurement would replace one. The ``TARGETS``
+table below still lists the ``AI_GP/config.py`` symbols of the flight client
+these constants must agree with.
 
 Run with --template measurements.json, fill measured fields, then:
     python tools/physical_constants.py measurements.json --output constants.json

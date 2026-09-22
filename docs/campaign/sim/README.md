@@ -92,11 +92,10 @@ git clone <url> && cd aigp-sim
 ```
 
 Isaac Sim 4.5 + Isaac Lab 2.1.0 + **skrl 1.4.2** (not 2.x — Isaac Lab 2.1 uses
-the 1.x runner API). Full pinned steps in [`RUNNING.md`](RUNNING.md).
+the 1.x runner API). Full pinned steps in [`docs/RUNBOOK_RUNPOD.md`](docs/RUNBOOK_RUNPOD.md).
 
-**Renting a GPU box?** [`DEPLOY_PROCEDURE.md`](DEPLOY_PROCEDURE.md) is the
-step-by-step that works; [`RUNPOD_SETUP.md`](RUNPOD_SETUP.md) is the catalogue
-of what goes wrong and why.
+**Renting a GPU box?** [`docs/RUNBOOK_RUNPOD.md`](docs/RUNBOOK_RUNPOD.md) is the
+step-by-step that works, with the catalogue of what goes wrong and why.
 
 **Read one of them first.** It lists
 every failure from a real attempt, in the order they bite. The first one is

@@ -10,7 +10,7 @@
 # Deliberately not a Python entry point: the things that go wrong here go wrong
 # before Python starts.
 #
-# See RUNPOD_SETUP.md for why each line is here. In short:
+# See docs/RUNBOOK_RUNPOD.md (Part 3) for why each line is here. In short:
 #   - a tmux server started from a 1024-fd shell caps every pane it spawns,
 #     and Isaac segfaults in SimulationApp.__init__ on a low limit
 #   - Isaac's SimulationApp.close() hard-exits, discarding buffered stdout and
