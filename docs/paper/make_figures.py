@@ -170,7 +170,30 @@ panel([load("~/dev/aigp-runs/gallery/sample/0919_214639_000160.jpg", 1400), load
 panel([load("~/Downloads/stack_sim_videos/paths_12_drones.png", 1600)],
       ["Twelve simulated attempts of the perception stack from the pad (plan view): blue = true path, dotted = the stack's own position estimate, X = crash"], "stack_sim_paths.png", 1)
 cs = load("~/dev/aigp-runs/videos/flight_contact_sheet.png", 1400); cs.save(os.path.join(OUT, "race_contact_sheet.jpg"), quality=80); print("wrote race_contact_sheet.jpg")
-Image.open(os.path.expanduser("~/dev/ai-grand-prix/pq/eval/pq_speed_best_play.png")).convert("RGB").save(os.path.join(OUT, "pq_speed_best_play.png"))
+kp = os.path.expanduser("~/dev/ai-grand-prix/pq/eval/pq_speed_best_play.png")
+if os.path.exists(kp): Image.open(kp).convert("RGB").save(os.path.join(OUT, "pq_speed_best_play.png"))
+# The 17 Sep briefing's vector figures, rasterised from the flight repo when it is present.
+briefing = os.path.expanduser("~/dev/ai-grand-prix/pq/briefing/figs")
 for n in ["course_overlay", "camera_fov", "stress_results", "retrain_curves", "bug_ab", "planb_tradeoff"]:
-    Image.open(os.path.join(HERE, "raw", n + ".png")).convert("RGB").save(os.path.join(OUT, n + ".png"))
+    src = os.path.join(briefing, n + ".pdf")
+    if not os.path.exists(src):
+        print("keeping committed", n + ".png (briefing PDF not found)"); continue
+    try:
+        import fitz  # PyMuPDF
+        fitz.open(src)[0].get_pixmap(dpi=200).save(os.path.join(OUT, n + ".png")); print("wrote", n + ".png")
+    except ImportError:
+        print("keeping committed", n + ".png (PyMuPDF not installed)")
 print("done")
+
+# 10. Video poster frames (extracted by ffmpeg-less cv2 in the venv; see README) ----
+try:
+    posters = [("poster_race_start_from_pad.jpg", "(a) race_start_from_pad.mp4: the 40 Hz racing policy lifts off the competition pad and takes gate 1"),
+               ("poster_race_best.jpg", "(b) race_best.mp4: the best racing checkpoint, chase camera"),
+               ("poster_stack_run_02.jpg", "(c) stack_run_02.mp4: the classical stack, chase view (left) and its own camera with detections (right)")]
+    imgs = [load(os.path.join(OUT, p), 1280) for p, _ in posters]
+    fig, axs = plt.subplots(3, 1, figsize=(7.2, 3.9 + 3.9 + 2.2))
+    for ax, im, (_, tt) in zip(axs, imgs, posters):
+        ax.imshow(im); ax.set_title(tt, fontsize=8, loc="left"); ax.axis("off")
+    fig.tight_layout(pad=0.4); save(fig, "video_posters.png")
+except FileNotFoundError as e:
+    print("skipping video posters:", e)
