@@ -36,7 +36,10 @@ event files of the pre-event training runs (via `tfevents.py`, a
 dependency-free reader), the briefing's vector figures, and the onboard camera
 captures and detector galleries. Those sources live in the flight repo and on
 the team laptop, not here; the generated PNGs are committed so the paper
-renders on GitHub without them.
+renders on GitHub without them. Each chart is also saved as `.svg` and `.pdf`
+with live text; the HTML-to-PDF build uses the SVGs and the LaTeX build the
+PDFs, so chart text is selectable in both renderings. Titles and encodings
+live in the captions, not inside the images.
 
 ## Figures
 

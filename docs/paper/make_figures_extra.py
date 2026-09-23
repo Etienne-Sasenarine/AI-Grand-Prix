@@ -59,7 +59,7 @@ ax.text(9.75, y0 - 0.62, "adapter on the command path: inverts the rate and thro
 box(ax, 0.35, 0.5, 2.0, 1.45, "transmitter", "AUX1 = ARM (radio only)\nAUX5 down = policy flies\nAUX2 = ANGLE", R)
 arrow(ax, (2.35, 1.5), (7.75, 2.9), "arming, and the override switch: the abort path", color=GREEN, rad=-0.12, fs=6.2)
 box(ax, 3.6, 0.5, 2.7, 1.45, "props-off handover check", "streams neutral sticks first (the buffer\nstarts at zero, which reads as failsafe),\nthen proves AUX5 off returns control", R)
-box(ax, 7.0, 0.5, 2.7, 1.45, "what never existed", "a height sensor: the barometer collapses\nunder prop wash, so height had to\ncome from the gate in view", "#fdecec", tc=RED)
+box(ax, 7.0, 0.5, 2.7, 1.45, "the missing sensor", "no usable height: the barometer collapses\nunder prop wash, so height comes\nfrom the gate in view", "#fdecec", tc=RED)
 headline(fig, "The chain from photons to motors, with what was measured on each link",
          "blue = telemetry back to the observation; orange = the command path where the sign, scale and curve faults of Section 6 lived")
 save(fig, "system_diagram.png")
@@ -94,8 +94,8 @@ good = {2: ["arrive; aircraft weighed 1745 g", "organizers' MSP library found"],
         6: ["40 Hz link, gyro counts, pitch sign measured", "40 Hz retrains; race40drop 10.2 gates/ep", "hand497 measured better"], 7: ["scored day"]}
 bad = {3: ["Betaflight console wedges the FC, twice", "'ANGLE' switch kills the aircraft (zero buffer)", "tip-overs in ACRO; airframe replaced"],
        4: ["FC silent again; recovered by hand"], 5: ["Betaflight reset; battery at 2.55 V/cell", "first policy flight: 0.45 s, into a wall"],
-       6: ["FC hangs with two MSP clients; armed on power-up twice", "fallback stack's first flight hits the ceiling", "replacement Jetson; RL shelved"],
-       7: ["no valid autonomous run; fleet of four lost"]}
+       6: ["FC hangs with two MSP clients attached; armed on power-up twice", "fallback stack's first flight hits the ceiling", "replacement Jetson; RL shelved"],
+       7: ["no autonomous run; all four aircraft grounded"]}
 for i, day in enumerate(days):
     a2.text(i, 1.02, day, ha="center", va="bottom", fontsize=7.5, fontweight="semibold", color=INK)
     yy = 0.95
@@ -103,8 +103,8 @@ for i, day in enumerate(days):
         t = textwrap.fill(t, 17); a2.text(i, yy, t, ha="center", va="top", fontsize=5.4, color=BLUE, linespacing=1.15); yy -= 0.062 * (t.count("\n") + 1) + 0.045
     yy = 0.22
     for t in bad.get(i, []):
-        t = textwrap.fill(t, 17); a2.text(i, yy, t, ha="center", va="top", fontsize=5.4, color=RED, linespacing=1.15); yy -= 0.062 * (t.count("\n") + 1) + 0.045
-a2.axhline(0.30, color=GRID, lw=0.8); a2.text(-0.6, 0.95, "progress", fontsize=7, color=BLUE, rotation=90, va="top", ha="center"); a2.text(-0.6, 0.22, "incidents", fontsize=7, color=RED, rotation=90, va="top", ha="center")
+        t = textwrap.fill(t, 15); a2.text(i, yy, t, ha="center", va="top", fontsize=5.4, color=RED, linespacing=1.15); yy -= 0.062 * (t.count("\n") + 1) + 0.045
+a2.axhline(0.30, color=GRID, lw=0.8); a2.text(-0.6, 0.95, "progress", fontsize=7, color=BLUE, rotation=90, va="top", ha="center"); a2.text(-0.6, 0.22, "setbacks", fontsize=7, color=RED, rotation=90, va="top", ha="center")
 a2.set_xlim(-0.75, 7.5); a2.set_ylim(-0.7, 1.15); a2.axis("off")
 a2.set_title("The week in the hall: what moved forward, and what the hardware did", loc="left", fontsize=8.5)
 headline(fig, "Four months, one week, no scored run", "top: eras with the milestone each one reached; bottom: the physical qualifier day by day, from the commit history and session notes", y=0.98)

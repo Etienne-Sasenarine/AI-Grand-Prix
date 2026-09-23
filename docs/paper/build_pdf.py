@@ -6,7 +6,12 @@ CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 src = open(os.path.join(HERE, "paper.md"), encoding="utf-8").read()
 body = markdown.markdown(src, extensions=["tables", "smarty"])
 # figure captions: an <em> paragraph directly after an image paragraph
-body = re.sub(r'<p><img alt="" src="([^"]+)" /></p>\s*<p><em>(.*?)</em></p>', r'<figure><img src="\1"><figcaption>\2</figcaption></figure>', body, flags=re.S)
+def _fig(m):
+    src, cap = m.group(1), m.group(2)
+    svg = os.path.splitext(src)[0] + ".svg"
+    if os.path.exists(os.path.join(HERE, svg)): src = svg     # live text in the printed PDF
+    return f'<figure><img src="{src}"><figcaption>{cap}</figcaption></figure>'
+body = re.sub(r'<p><img alt="" src="([^"]+)" /></p>\s*<p><em>(.*?)</em></p>', _fig, body, flags=re.S)
 css = """
 @page { size: A4; margin: 22mm 20mm 24mm 20mm; @bottom-center { content: counter(page); font: 9pt Georgia, serif; color: #555; } }
 body { font-family: Georgia, 'Times New Roman', serif; font-size: 10.5pt; line-height: 1.42; color: #111; max-width: 170mm; margin: 0 auto; }

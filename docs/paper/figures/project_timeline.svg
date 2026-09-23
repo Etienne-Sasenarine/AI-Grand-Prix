@@ -1,0 +1,416 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN"
+  "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg xmlns:xlink="http://www.w3.org/1999/xlink" width="467.762709pt" height="414.938672pt" viewBox="0 0 467.762709 414.938672" xmlns="http://www.w3.org/2000/svg" version="1.1">
+ <metadata>
+  <rdf:RDF xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:cc="http://creativecommons.org/ns#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+   <cc:Work>
+    <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
+    <dc:date>2026-09-23T17:45:07.197965</dc:date>
+    <dc:format>image/svg+xml</dc:format>
+    <dc:creator>
+     <cc:Agent>
+      <dc:title>Matplotlib v3.9.4, https://matplotlib.org/</dc:title>
+     </cc:Agent>
+    </dc:creator>
+   </cc:Work>
+  </rdf:RDF>
+ </metadata>
+ <defs>
+  <style type="text/css">*{stroke-linejoin: round; stroke-linecap: butt}</style>
+ </defs>
+ <g id="figure_1">
+  <g id="patch_1">
+   <path d="M 0 414.938672 
+L 467.762709 414.938672 
+L 467.762709 -0 
+L 0 -0 
+z
+" style="fill: #ffffff"/>
+  </g>
+  <g id="axes_1">
+   <g id="patch_2">
+    <path d="M 27.113906 110.971613 
+L 440.033906 110.971613 
+L 440.033906 19.658672 
+L 27.113906 19.658672 
+z
+" style="fill: #ffffff"/>
+   </g>
+   <g id="matplotlib.axis_1">
+    <g id="xtick_1">
+     <g id="line2d_1">
+      <defs>
+       <path id="m2e4eb68851" d="M 0 0 
+L 0 3.5 
+" style="stroke: #52514e; stroke-width: 0.8"/>
+      </defs>
+      <g>
+       <use xlink:href="#m2e4eb68851" x="27.113906" y="110.971613" style="fill: #52514e; stroke: #52514e; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_1">
+      <text style="fill: #52514e; font: 9px 'DejaVu Sans'; text-anchor: middle" x="27.113906" y="124.810207" transform="rotate(-0 27.113906 124.810207)">Jun 2026</text>
+     </g>
+    </g>
+    <g id="xtick_2">
+     <g id="line2d_2">
+      <g>
+       <use xlink:href="#m2e4eb68851" x="134.832167" y="110.971613" style="fill: #52514e; stroke: #52514e; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_2">
+      <text style="fill: #52514e; font: 9px 'DejaVu Sans'; text-anchor: middle" x="134.832167" y="124.810207" transform="rotate(-0 134.832167 124.810207)">Jul 2026</text>
+     </g>
+    </g>
+    <g id="xtick_3">
+     <g id="line2d_3">
+      <g>
+       <use xlink:href="#m2e4eb68851" x="246.141037" y="110.971613" style="fill: #52514e; stroke: #52514e; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_3">
+      <text style="fill: #52514e; font: 9px 'DejaVu Sans'; text-anchor: middle" x="246.141037" y="124.810207" transform="rotate(-0 246.141037 124.810207)">Aug 2026</text>
+     </g>
+    </g>
+    <g id="xtick_4">
+     <g id="line2d_4">
+      <g>
+       <use xlink:href="#m2e4eb68851" x="357.449906" y="110.971613" style="fill: #52514e; stroke: #52514e; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_4">
+      <text style="fill: #52514e; font: 9px 'DejaVu Sans'; text-anchor: middle" x="357.449906" y="124.810207" transform="rotate(-0 357.449906 124.810207)">Sep 2026</text>
+     </g>
+    </g>
+   </g>
+   <g id="matplotlib.axis_2"/>
+   <g id="patch_3">
+    <path d="M 34.295124 60.749495 
+L 124.060341 60.749495 
+L 124.060341 24.224319 
+L 34.295124 24.224319 
+z
+" clip-path="url(#p56be40e51e)" style="fill: #2a78d6; opacity: 0.22"/>
+   </g>
+   <g id="patch_4">
+    <path d="M 124.060341 60.749495 
+L 256.912863 60.749495 
+L 256.912863 24.224319 
+L 124.060341 24.224319 
+z
+" clip-path="url(#p56be40e51e)" style="fill: #1baf7a; opacity: 0.22"/>
+   </g>
+   <g id="patch_5">
+    <path d="M 256.912863 60.749495 
+L 350.268689 60.749495 
+L 350.268689 24.224319 
+L 256.912863 24.224319 
+z
+" clip-path="url(#p56be40e51e)" style="fill: #eda100; opacity: 0.22"/>
+   </g>
+   <g id="patch_6">
+    <path d="M 350.268689 60.749495 
+L 411.309037 60.749495 
+L 411.309037 24.224319 
+L 350.268689 24.224319 
+z
+" clip-path="url(#p56be40e51e)" style="fill: #eb6834; opacity: 0.22"/>
+   </g>
+   <g id="patch_7">
+    <path d="M 411.309037 60.749495 
+L 436.443298 60.749495 
+L 436.443298 24.224319 
+L 411.309037 24.224319 
+z
+" clip-path="url(#p56be40e51e)" style="fill: #e34948; opacity: 0.22"/>
+   </g>
+   <g id="line2d_5">
+    <path d="M 45.06695 58.79279 
+L 45.06695 69.228554 
+" clip-path="url(#p56be40e51e)" style="fill: none; stroke: #8a8985; stroke-width: 0.6; stroke-linecap: square"/>
+   </g>
+   <g id="line2d_6">
+    <defs>
+     <path id="m3f07c19e67" d="M 0 1.5 
+C 0.397805 1.5 0.77937 1.341951 1.06066 1.06066 
+C 1.341951 0.77937 1.5 0.397805 1.5 0 
+C 1.5 -0.397805 1.341951 -0.77937 1.06066 -1.06066 
+C 0.77937 -1.341951 0.397805 -1.5 0 -1.5 
+C -0.397805 -1.5 -0.77937 -1.341951 -1.06066 -1.06066 
+C -1.341951 -0.77937 -1.5 -0.397805 -1.5 0 
+C -1.5 0.397805 -1.341951 0.77937 -1.06066 1.06066 
+C -0.77937 1.341951 -0.397805 1.5 0 1.5 
+z
+" style="stroke: #0b0b0b"/>
+    </defs>
+    <g clip-path="url(#p56be40e51e)">
+     <use xlink:href="#m3f07c19e67" x="45.06695" y="58.79279" style="fill: #0b0b0b; stroke: #0b0b0b"/>
+    </g>
+   </g>
+   <g id="line2d_7">
+    <path d="M 95.335471 58.79279 
+L 95.335471 78.794672 
+" clip-path="url(#p56be40e51e)" style="fill: none; stroke: #8a8985; stroke-width: 0.6; stroke-linecap: square"/>
+   </g>
+   <g id="line2d_8">
+    <g clip-path="url(#p56be40e51e)">
+     <use xlink:href="#m3f07c19e67" x="95.335471" y="58.79279" style="fill: #0b0b0b; stroke: #0b0b0b"/>
+    </g>
+   </g>
+   <g id="line2d_9">
+    <path d="M 221.006776 58.79279 
+L 221.006776 88.36079 
+" clip-path="url(#p56be40e51e)" style="fill: none; stroke: #8a8985; stroke-width: 0.6; stroke-linecap: square"/>
+   </g>
+   <g id="line2d_10">
+    <g clip-path="url(#p56be40e51e)">
+     <use xlink:href="#m3f07c19e67" x="221.006776" y="58.79279" style="fill: #0b0b0b; stroke: #0b0b0b"/>
+    </g>
+   </g>
+   <g id="line2d_11">
+    <path d="M 228.187993 58.79279 
+L 228.187993 69.228554 
+" clip-path="url(#p56be40e51e)" style="fill: none; stroke: #8a8985; stroke-width: 0.6; stroke-linecap: square"/>
+   </g>
+   <g id="line2d_12">
+    <g clip-path="url(#p56be40e51e)">
+     <use xlink:href="#m3f07c19e67" x="228.187993" y="58.79279" style="fill: #0b0b0b; stroke: #0b0b0b"/>
+    </g>
+   </g>
+   <g id="line2d_13">
+    <path d="M 300.000167 58.79279 
+L 300.000167 78.794672 
+" clip-path="url(#p56be40e51e)" style="fill: none; stroke: #8a8985; stroke-width: 0.6; stroke-linecap: square"/>
+   </g>
+   <g id="line2d_14">
+    <g clip-path="url(#p56be40e51e)">
+     <use xlink:href="#m3f07c19e67" x="300.000167" y="58.79279" style="fill: #0b0b0b; stroke: #0b0b0b"/>
+    </g>
+   </g>
+   <g id="line2d_15">
+    <path d="M 371.812341 58.79279 
+L 371.812341 88.36079 
+" clip-path="url(#p56be40e51e)" style="fill: none; stroke: #8a8985; stroke-width: 0.6; stroke-linecap: square"/>
+   </g>
+   <g id="line2d_16">
+    <g clip-path="url(#p56be40e51e)">
+     <use xlink:href="#m3f07c19e67" x="371.812341" y="58.79279" style="fill: #0b0b0b; stroke: #0b0b0b"/>
+    </g>
+   </g>
+   <g id="line2d_17">
+    <path d="M 411.309037 58.79279 
+L 411.309037 69.228554 
+" clip-path="url(#p56be40e51e)" style="fill: none; stroke: #8a8985; stroke-width: 0.6; stroke-linecap: square"/>
+   </g>
+   <g id="line2d_18">
+    <g clip-path="url(#p56be40e51e)">
+     <use xlink:href="#m3f07c19e67" x="411.309037" y="58.79279" style="fill: #0b0b0b; stroke: #0b0b0b"/>
+    </g>
+   </g>
+   <g id="patch_8">
+    <path d="M 27.113906 110.971613 
+L 440.033906 110.971613 
+" style="fill: none; stroke: #52514e; stroke-width: 0.8; stroke-linejoin: miter; stroke-linecap: square"/>
+   </g>
+   <g id="text_5">
+    <text style="fill: #0b0b0b; font: 6px 'DejaVu Sans'" transform="translate(53.281639 36.336786)">Virtual qualifier 1</text>
+    <text style="fill: #0b0b0b; font: 6px 'DejaVu Sans'" transform="translate(55.623982 43.055473)">HSV mask, PnP,</text>
+    <text style="fill: #0b0b0b; font: 6px 'DejaVu Sans'" transform="translate(55.142107 49.774161)">waypoint replay</text>
+   </g>
+   <g id="text_6">
+    <text style="fill: #0b0b0b; font: 6px 'DejaVu Sans'" transform="translate(164.590508 36.336786)">Virtual qualifier 2</text>
+    <text style="fill: #0b0b0b; font: 6px 'DejaVu Sans'" transform="translate(136.553633 43.055473)">YOLO corners + IMU, dual-gate EKF,</text>
+    <text style="fill: #0b0b0b; font: 6px 'DejaVu Sans'" transform="translate(173.364102 49.774161)">DreamerV3</text>
+   </g>
+   <g id="text_7">
+    <text style="fill: #0b0b0b; font: 6px 'DejaVu Sans'" transform="translate(280.672651 36.336786)">Classical stack,</text>
+    <text style="fill: #0b0b0b; font: 6px 'DejaVu Sans'" transform="translate(286.142026 43.055473)">snake gate,</text>
+    <text style="fill: #0b0b0b; font: 6px 'DejaVu Sans'" transform="translate(286.729838 49.774161)">HG-DAgger</text>
+   </g>
+   <g id="text_8">
+    <text style="fill: #0b0b0b; font: 6px 'DejaVu Sans'" transform="translate(355.02355 39.69613)">Isaac Lab PPO on</text>
+    <text style="fill: #0b0b0b; font: 6px 'DejaVu Sans'" transform="translate(354.216363 46.414817)">a digitised course</text>
+   </g>
+   <g id="text_9">
+    <text style="fill: #0b0b0b; font: 6px 'DejaVu Sans'" transform="translate(420.139292 39.69613)">on</text>
+    <text style="fill: #0b0b0b; font: 6px 'DejaVu Sans'" transform="translate(418.457886 46.414817)">site</text>
+   </g>
+   <g id="text_10">
+    <text style="fill: #52514e; font: 6.2px 'DejaVu Sans'; text-anchor: middle" x="45.06695" y="76.548527" transform="rotate(-0 45.06695 76.548527)">first gate passed</text>
+   </g>
+   <g id="text_11">
+    <text style="fill: #52514e; font: 6.2px 'DejaVu Sans'" transform="translate(46.971112 86.114644)">replay laps the course in &lt;14 s</text>
+    <text style="fill: #52514e; font: 6.2px 'DejaVu Sans'" transform="translate(60.19794 93.057288)">(on simulator position)</text>
+   </g>
+   <g id="text_12">
+    <text style="fill: #52514e; font: 6.2px 'DejaVu Sans'; text-anchor: middle" x="221.006776" y="95.680762" transform="rotate(-0 221.006776 95.680762)">DreamerV3: 168k steps, 0 gates</text>
+   </g>
+   <g id="text_13">
+    <text style="fill: #52514e; font: 6.2px 'DejaVu Sans'; text-anchor: middle" x="228.187993" y="76.548527" transform="rotate(-0 228.187993 76.548527)">PnP + IMU passes gates 1-2</text>
+   </g>
+   <g id="text_14">
+    <text style="fill: #52514e; font: 6.2px 'DejaVu Sans'; text-anchor: middle" x="300.000167" y="86.114644" transform="rotate(-0 300.000167 86.114644)">human best 14.04 s</text>
+   </g>
+   <g id="text_15">
+    <text style="fill: #52514e; font: 6.2px 'DejaVu Sans'; text-anchor: middle" x="371.812341" y="95.680762" transform="rotate(-0 371.812341 95.680762)">pq_speed_best: 59 gates / 40 s</text>
+   </g>
+   <g id="text_16">
+    <text style="fill: #52514e; font: 6.2px 'DejaVu Sans'" transform="translate(362.055365 76.548527)">audit: camera, track, reset bug;</text>
+    <text style="fill: #52514e; font: 6.2px 'DejaVu Sans'" transform="translate(392.554037 83.49117)">stress study</text>
+   </g>
+   <g id="text_17">
+    <text style="font: 8.5px 'DejaVu Sans'; text-anchor: start" x="27.113906" y="13.658672" transform="rotate(-0 27.113906 13.658672)">June to September: three generations of approach on the virtual qualifiers, then a fourth for the hall</text>
+   </g>
+  </g>
+  <g id="axes_2">
+   <g id="line2d_19">
+    <path d="M 27.113906 289.27864 
+L 440.033906 289.27864 
+" clip-path="url(#p0d9d2205f2)" style="fill: none; stroke: #e6e5e1; stroke-width: 0.8; stroke-linecap: square"/>
+   </g>
+   <g id="text_18">
+    <text style="fill: #0b0b0b; font: 600 7.5px 'DejaVu Sans'; text-anchor: middle" x="64.652088" y="202.427652" transform="rotate(-0 64.652088 202.427652)">15 Sep</text>
+   </g>
+   <g id="text_19">
+    <text style="fill: #0b0b0b; font: 600 7.5px 'DejaVu Sans'; text-anchor: middle" x="114.702997" y="202.427652" transform="rotate(-0 114.702997 202.427652)">16 Sep</text>
+   </g>
+   <g id="text_20">
+    <text style="fill: #0b0b0b; font: 600 7.5px 'DejaVu Sans'; text-anchor: middle" x="164.753906" y="202.427652" transform="rotate(-0 164.753906 202.427652)">17 Sep</text>
+   </g>
+   <g id="text_21">
+    <text style="fill: #2a78d6; font: 5.4px 'DejaVu Sans'" transform="translate(145.484766 216.382776)">arrive; aircraft</text>
+    <text style="fill: #2a78d6; font: 5.4px 'DejaVu Sans'" transform="translate(143.031984 222.224437)">weighed 1745 g</text>
+   </g>
+   <g id="text_22">
+    <text style="fill: #2a78d6; font: 5.4px 'DejaVu Sans'" transform="translate(143.342484 236.402521)">organizers' MSP</text>
+    <text style="fill: #2a78d6; font: 5.4px 'DejaVu Sans'" transform="translate(147.470109 242.244182)">library found</text>
+   </g>
+   <g id="text_23">
+    <text style="fill: #0b0b0b; font: 600 7.5px 'DejaVu Sans'; text-anchor: middle" x="214.804815" y="202.427652" transform="rotate(-0 214.804815 202.427652)">18 Sep</text>
+   </g>
+   <g id="text_24">
+    <text style="fill: #2a78d6; font: 5.4px 'DejaVu Sans'" transform="translate(193.418284 216.382776)">camera capture</text>
+    <text style="fill: #2a78d6; font: 5.4px 'DejaVu Sans'" transform="translate(194.040972 222.224437)">works headless</text>
+   </g>
+   <g id="text_25">
+    <text style="fill: #e34948; font: 5.4px 'DejaVu Sans'" transform="translate(201.643581 302.858599)">Betaflight</text>
+    <text style="fill: #e34948; font: 5.4px 'DejaVu Sans'" transform="translate(193.263456 308.70026)">console wedges</text>
+    <text style="fill: #e34948; font: 5.4px 'DejaVu Sans'" transform="translate(197.198706 314.541921)">the FC, twice</text>
+   </g>
+   <g id="text_26">
+    <text style="fill: #e34948; font: 5.4px 'DejaVu Sans'" transform="translate(194.674206 330.222866)">'ANGLE' switch</text>
+    <text style="fill: #e34948; font: 5.4px 'DejaVu Sans'" transform="translate(204.295487 336.064527)">kills the</text>
+    <text style="fill: #e34948; font: 5.4px 'DejaVu Sans'" transform="translate(197.448878 341.906188)">aircraft (zero</text>
+    <text style="fill: #e34948; font: 5.4px 'DejaVu Sans'" transform="translate(205.653925 347.747849)">buffer)</text>
+   </g>
+   <g id="text_27">
+    <text style="fill: #e34948; font: 5.4px 'DejaVu Sans'" transform="translate(199.510159 364.931656)">tip-overs in</text>
+    <text style="fill: #e34948; font: 5.4px 'DejaVu Sans'" transform="translate(193.829612 370.773316)">ACRO; airframe</text>
+    <text style="fill: #e34948; font: 5.4px 'DejaVu Sans'" transform="translate(203.115503 376.614977)">replaced</text>
+   </g>
+   <g id="text_28">
+    <text style="fill: #0b0b0b; font: 600 7.5px 'DejaVu Sans'; text-anchor: middle" x="264.855724" y="202.427652" transform="rotate(-0 264.855724 202.427652)">19 Sep</text>
+   </g>
+   <g id="text_29">
+    <text style="fill: #2a78d6; font: 5.4px 'DejaVu Sans'" transform="translate(246.793568 216.382776)">auto-labeller;</text>
+    <text style="fill: #2a78d6; font: 5.4px 'DejaVu Sans'" transform="translate(240.766662 222.224437)">1207 gate frames</text>
+   </g>
+   <g id="text_30">
+    <text style="fill: #2a78d6; font: 5.4px 'DejaVu Sans'" transform="translate(245.91649 236.402521)">Plan B chosen</text>
+    <text style="fill: #2a78d6; font: 5.4px 'DejaVu Sans'" transform="translate(244.738193 242.244182)">over the policy</text>
+   </g>
+   <g id="text_31">
+    <text style="fill: #e34948; font: 5.4px 'DejaVu Sans'" transform="translate(253.221678 302.858599)">FC silent</text>
+    <text style="fill: #e34948; font: 5.4px 'DejaVu Sans'" transform="translate(256.461678 308.70026)">again;</text>
+    <text style="fill: #e34948; font: 5.4px 'DejaVu Sans'" transform="translate(247.154271 314.541921)">recovered by</text>
+    <text style="fill: #e34948; font: 5.4px 'DejaVu Sans'" transform="translate(258.064803 320.383582)">hand</text>
+   </g>
+   <g id="text_32">
+    <text style="fill: #0b0b0b; font: 600 7.5px 'DejaVu Sans'; text-anchor: middle" x="314.906634" y="202.427652" transform="rotate(-0 314.906634 202.427652)">20 Sep</text>
+   </g>
+   <g id="text_33">
+    <text style="fill: #2a78d6; font: 5.4px 'DejaVu Sans'" transform="translate(288.780759 216.382776)">hand434 deployed,</text>
+    <text style="fill: #2a78d6; font: 5.4px 'DejaVu Sans'" transform="translate(295.322774 222.224437)">threshold 0.25</text>
+   </g>
+   <g id="text_34">
+    <text style="fill: #2a78d6; font: 5.4px 'DejaVu Sans'" transform="translate(293.793477 236.402521)">rate-map audit:</text>
+    <text style="fill: #2a78d6; font: 5.4px 'DejaVu Sans'" transform="translate(295.260337 242.244182)">0.62x to 2.40x</text>
+   </g>
+   <g id="text_35">
+    <text style="fill: #e34948; font: 5.4px 'DejaVu Sans'" transform="translate(301.745399 302.858599)">Betaflight</text>
+    <text style="fill: #e34948; font: 5.4px 'DejaVu Sans'" transform="translate(296.447071 308.70026)">reset; battery</text>
+    <text style="fill: #e34948; font: 5.4px 'DejaVu Sans'" transform="translate(297.063009 314.541921)">at 2.55 V/cell</text>
+   </g>
+   <g id="text_36">
+    <text style="fill: #e34948; font: 5.4px 'DejaVu Sans'" transform="translate(300.824024 330.222866)">first policy</text>
+    <text style="fill: #e34948; font: 5.4px 'DejaVu Sans'" transform="translate(297.07018 336.064527)">flight: 0.45 s,</text>
+    <text style="fill: #e34948; font: 5.4px 'DejaVu Sans'" transform="translate(301.001212 341.906188)">into a wall</text>
+   </g>
+   <g id="text_37">
+    <text style="fill: #0b0b0b; font: 600 7.5px 'DejaVu Sans'; text-anchor: middle" x="364.957543" y="202.427652" transform="rotate(-0 364.957543 202.427652)">21 Sep</text>
+   </g>
+   <g id="text_38">
+    <text style="fill: #2a78d6; font: 5.4px 'DejaVu Sans'" transform="translate(343.853668 216.382776)">40 Hz link, gyro</text>
+    <text style="fill: #2a78d6; font: 5.4px 'DejaVu Sans'" transform="translate(347.499089 222.224437)">counts, pitch</text>
+    <text style="fill: #2a78d6; font: 5.4px 'DejaVu Sans'" transform="translate(345.029433 228.066098)">sign measured</text>
+   </g>
+   <g id="text_39">
+    <text style="fill: #2a78d6; font: 5.4px 'DejaVu Sans'" transform="translate(345.047152 243.747043)">40 Hz retrains;</text>
+    <text style="fill: #2a78d6; font: 5.4px 'DejaVu Sans'" transform="translate(342.612089 249.588704)">race40drop 10.2</text>
+    <text style="fill: #2a78d6; font: 5.4px 'DejaVu Sans'" transform="translate(353.177527 255.430365)">gates/ep</text>
+   </g>
+   <g id="text_40">
+    <text style="fill: #2a78d6; font: 5.4px 'DejaVu Sans'" transform="translate(338.666714 271.11131)">hand497 measured</text>
+    <text style="fill: #2a78d6; font: 5.4px 'DejaVu Sans'" transform="translate(356.693855 276.952971)">better</text>
+   </g>
+   <g id="text_41">
+    <text style="fill: #e34948; font: 5.4px 'DejaVu Sans'" transform="translate(345.877824 302.858599)">FC hangs with</text>
+    <text style="fill: #e34948; font: 5.4px 'DejaVu Sans'" transform="translate(343.828777 308.70026)">two MSP clients</text>
+    <text style="fill: #e34948; font: 5.4px 'DejaVu Sans'" transform="translate(342.469918 314.541921)">attached; armed</text>
+    <text style="fill: #e34948; font: 5.4px 'DejaVu Sans'" transform="translate(348.163543 320.383582)">on power-up</text>
+    <text style="fill: #e34948; font: 5.4px 'DejaVu Sans'" transform="translate(357.794949 326.225243)">twice</text>
+   </g>
+   <g id="text_42">
+    <text style="fill: #e34948; font: 5.4px 'DejaVu Sans'" transform="translate(354.435558 344.91191)">fallback</text>
+    <text style="fill: #e34948; font: 5.4px 'DejaVu Sans'" transform="translate(349.507636 350.753571)">stack's first</text>
+    <text style="fill: #e34948; font: 5.4px 'DejaVu Sans'" transform="translate(346.949808 356.595232)">flight hits the</text>
+    <text style="fill: #e34948; font: 5.4px 'DejaVu Sans'" transform="translate(356.136136 362.436893)">ceiling</text>
+   </g>
+   <g id="text_43">
+    <text style="fill: #e34948; font: 5.4px 'DejaVu Sans'" transform="translate(347.921386 379.620699)">replacement</text>
+    <text style="fill: #e34948; font: 5.4px 'DejaVu Sans'" transform="translate(351.523355 385.46236)">Jetson; RL</text>
+    <text style="fill: #e34948; font: 5.4px 'DejaVu Sans'" transform="translate(354.454964 391.304021)">shelved</text>
+   </g>
+   <g id="text_44">
+    <text style="fill: #0b0b0b; font: 600 7.5px 'DejaVu Sans'; text-anchor: middle" x="415.008452" y="202.427652" transform="rotate(-0 415.008452 202.427652)">22 Sep</text>
+   </g>
+   <g id="text_45">
+    <text style="fill: #2a78d6; font: 5.4px 'DejaVu Sans'; text-anchor: middle" x="415.008452" y="216.382776" transform="rotate(-0 415.008452 216.382776)">scored day</text>
+   </g>
+   <g id="text_46">
+    <text style="fill: #e34948; font: 5.4px 'DejaVu Sans'" transform="translate(393.94803 302.858599)">no autonomous</text>
+    <text style="fill: #e34948; font: 5.4px 'DejaVu Sans'" transform="translate(399.272092 308.70026)">run; all four</text>
+    <text style="fill: #e34948; font: 5.4px 'DejaVu Sans'" transform="translate(405.343717 314.541921)">aircraft</text>
+    <text style="fill: #e34948; font: 5.4px 'DejaVu Sans'" transform="translate(402.081358 320.383582)">grounded</text>
+   </g>
+   <g id="text_47">
+    <text style="fill: #2a78d6; font: 7px 'DejaVu Sans'" transform="translate(36.553105 242.491182) rotate(-90)">progress</text>
+   </g>
+   <g id="text_48">
+    <text style="fill: #e34948; font: 7px 'DejaVu Sans'" transform="translate(36.553105 329.735911) rotate(-90)">setbacks</text>
+   </g>
+   <g id="text_49">
+    <text style="font: 8.5px 'DejaVu Sans'; text-anchor: start" x="27.113906" y="182.587613" transform="rotate(-0 27.113906 182.587613)">The week in the hall: what moved forward, and what the hardware did</text>
+   </g>
+  </g>
+ </g>
+ <defs>
+  <clipPath id="p56be40e51e">
+   <rect x="27.113906" y="19.658672" width="412.92" height="91.312941"/>
+  </clipPath>
+  <clipPath id="p0d9d2205f2">
+   <rect x="27.113906" y="188.587613" width="412.92" height="219.151059"/>
+  </clipPath>
+ </defs>
+</svg>

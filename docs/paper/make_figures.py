@@ -25,12 +25,21 @@ INK, INK2, INK3, GRID, PALE = "#0b0b0b", "#52514e", "#8a8985", "#e6e5e1", "#f3f2
 rcParams.update({"font.family": "DejaVu Sans", "font.size": 9, "axes.edgecolor": INK2, "axes.labelcolor": INK, "xtick.color": INK2, "ytick.color": INK2,
                  "axes.spines.top": False, "axes.spines.right": False, "axes.grid": True, "grid.color": GRID, "grid.linewidth": 0.6, "axes.axisbelow": True,
                  "figure.facecolor": "white", "axes.facecolor": "white", "legend.frameon": False, "figure.dpi": 200, "savefig.dpi": 200, "savefig.bbox": "tight",
-                 "axes.titlesize": 9, "axes.titleweight": "normal"})
+                 "axes.titlesize": 9, "axes.titleweight": "normal", "svg.fonttype": "none", "pdf.fonttype": 42})
 
-def save(fig, name):
-    p = os.path.join(OUT, name); fig.savefig(p); plt.close(fig); print("wrote", p)
+HEADLINES = False   # titles and subtitles live in the paper's captions, where the text is selectable
+
+def save(fig, name, vector=True):
+    """PNG for GitHub, plus PDF and SVG with live text for the two typeset renderings (charts only; photo composites stay raster)."""
+    p = os.path.join(OUT, name); fig.savefig(p)
+    if vector:
+        stem = os.path.splitext(p)[0]
+        fig.savefig(stem + ".pdf"); fig.savefig(stem + ".svg")
+    plt.close(fig); print("wrote", p)
 
 def headline(fig, title, subtitle, y=1.0):
+    if not HEADLINES:
+        return
     h = fig.get_size_inches()[1]
     fig.text(0.0, y + 0.30 / h, title, fontsize=10.5, fontweight="semibold", color=INK, ha="left", va="bottom", transform=fig.transFigure)
     w = fig.get_size_inches()[0]
@@ -67,7 +76,7 @@ fig, ax = plt.subplots(figsize=(7.2, 3.6))
 y = dumbbell(ax, conds, surv, sett, BLUE, ORANGE, "survived the 15 s episode", "settled: within 0.30 m and under 0.30 m/s")
 ax.set_xlim(-6, 108); ax.set_xlabel("% of 4096 episodes")
 ax.legend(loc="lower left", fontsize=7.5, ncol=1, bbox_to_anchor=(0.0, -0.32))
-note(ax, "the 60 Hz policy run at 40 Hz\nlooks like this row", xy=(13.0, y[5]), xytext=(30, y[5] - 0.55), color=ORANGE)
+note(ax, "a 60 Hz policy run at 40 Hz\nsees this condition", xy=(13.0, y[5]), xytext=(30, y[5] - 0.55), color=ORANGE)
 ax.text(36, y[1] + 0.02, "robust to how the aircraft responds", fontsize=7.4, color=INK2, va="center", ha="center", style="italic")
 ax.text(40, y[4] + 0.02, "fragile to how much thrust it needs", fontsize=7.4, color=INK2, va="center", ha="center", style="italic")
 headline(fig, "The hover policy under eight perturbations",
@@ -176,12 +185,12 @@ th = [0.10, 0.25, 0.40, 0.50]; usable = [89, 67, 60, 53]; ready = [79, 59, 50, 3
 a3.fill_betweenx([0, 100], 0.25, 0.5, color=PALE, lw=0)
 a3.plot(th, usable, "-o", color=BLUE, ms=4.5, mec="white", lw=2); a3.plot(th, ready, "-o", color=ORANGE, ms=4.5, mec="white", lw=2)
 a3.text(0.515, 53, "frames with\n4+ corners", color=BLUE, fontsize=7.2, va="center"); a3.text(0.515, 36, "policy ready\n(6 good frames\nin a row)", color=ORANGE, fontsize=7.2, va="center")
-a3.axvline(0.5, color=INK2, lw=0.8, ls=":"); a3.text(0.51, 99, "library default,\nnever chosen", fontsize=6.8, ha="left", va="top", color=INK2)
+a3.axvline(0.5, color=INK2, lw=0.8, ls=":"); a3.text(0.51, 99, "library\ndefault", fontsize=6.8, ha="left", va="top", color=INK2)
 a3.axvline(0.25, color=INK2, lw=0.8, ls="--"); a3.text(0.24, 99, "chosen at\nthe gate", fontsize=6.8, ha="right", va="top", color=INK2)
 a3.annotate("", xy=(0.25, 59), xytext=(0.5, 36), arrowprops=dict(arrowstyle="-|>", color=ORANGE, lw=0.9, connectionstyle="arc3,rad=-0.3"))
 a3.text(0.40, 44, "+23 points", color=ORANGE, fontsize=7.5, ha="center")
 a3.set_xlabel("keypoint confidence threshold"); a3.set_ylabel("% of 1345 frames at a real gate"); a3.set_ylim(0, 100); a3.set_xlim(0.08, 0.72); a3.set_xticks([0.1, 0.25, 0.5])
-a3.set_title("An inherited threshold cost the data", loc="left", fontsize=8.5)
+a3.set_title("The corner-visibility threshold", loc="left", fontsize=8.5)
 headline(fig, "What decided the detector",
          "left: the fine-tune against the incumbent; centre: why every earlier mAP was optimistic; right: the corner-visibility threshold, measured at a real gate on 21 Sep")
 save(fig, "perception_numbers.png")
@@ -238,7 +247,7 @@ def panel(imgs, titles, name, ncol, figw=7.2):
     for ax, im, tt in zip(axs, imgs, titles):
         ax.imshow(im); ax.set_title(tt, fontsize=8, loc="left"); ax.axis("off")
     for ax in axs[n:]: ax.axis("off")
-    fig.tight_layout(pad=0.4); save(fig, name)
+    fig.tight_layout(pad=0.4); save(fig, name, vector=False)
 
 try:
     panel([load("~/Downloads/gate frames/0919_220524_000107.jpg", 960), load("~/dev/aigp-runs/drone_frames/0920_224905_f00150.jpg", 960),
@@ -276,7 +285,7 @@ try:
     fig, axs = plt.subplots(3, 1, figsize=(7.2, 3.9 + 3.9 + 2.2))
     for ax, im, (_, tt) in zip(axs, imgs, posters):
         ax.imshow(im); ax.set_title(tt, fontsize=8, loc="left"); ax.axis("off")
-    fig.tight_layout(pad=0.4); save(fig, "video_posters.png")
+    fig.tight_layout(pad=0.4); save(fig, "video_posters.png", vector=False)
 except FileNotFoundError as e:
     print("skipping video posters:", e)
 print("done")
