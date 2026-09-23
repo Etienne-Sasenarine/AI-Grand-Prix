@@ -21,7 +21,7 @@ We claim four contributions.
 \item \textbf{A perception pipeline} that bootstraps gate-corner labels from the gate's own geometry, lets a detector propose where geometry cannot trace, and then replaces both with human labels once the self-scored accuracy turns out to be optimistic by a factor of six (Section 4).
 \item \textbf{A simulation and training stack} built around an explicit, hashed observation contract shared by simulator and aircraft, with a plant model whose mass is measured and whose rate-loop gains are derived, latency and vision-delay modelling, and a corner-dropout augmentation calibrated on the real detector (Section 5).
 \item \textbf{Bench measurements on the real aircraft} settling the control rate, the gyro scale, the axis conventions and the stick mapping. At least one runner had assumed each of them wrongly before it was measured (Section 6).
-\item \textbf{A documented failure chain} from working simulator to empty scoresheet, with the hardware incidents in order (Section 7) and the lessons we would carry into a second attempt (Section 8).
+\item \textbf{A documented failure chain} from working simulator to empty scoresheet, with the hardware incidents in order (Section 7), an engineering post-mortem of the software-to-hardware seam (Section 8), and the lessons we would carry into a second attempt (Section 9).
 \end{enumerate}
 \section{The competition, the course and the aircraft}
 \subsection{Rules that shaped the design}
@@ -195,6 +195,68 @@ No scoresheet for 21--22 September exists in any repository, and the last commit
 \caption{The classical fallback stack, flown in Isaac against a pessimistic sensor model (every gate detected, gate-shaped false positives, sticky corner dropout, 60 ms latency, an unknown self-levelling gain). Most crashes fall between gates 5 and 6, where the course reverses.}\end{figure}
 What would have had to be true for a scored run? The list is short, and none of it was. A usable height sensor; the aircraft had none. Detector corners available more than 59\% of the time, in gaps the policy had trained against; it had only just begun to. A link fast enough for the policies, or policies slow enough for the link; the two met only on the last day. A command path free of a 2.4$\times$ rate map, an inverted pitch axis and a yaw sign taken from the wrong message; each was present at some point, the pitch inversion on every runner until 21 September. One enablement sequence instead of three competing in the same week (ACRO with the switch first; ANGLE with arming first; ANGLE in every switch position), each adopted in turn. And a props-off handover check, the one test that proves the abort path works, run after the last change rather than deferred by choice. The team's own closing estimate for passing two gates was 30--40\%, with the note that nothing in the onboard racing client had ever touched the aircraft.
 
+\section{The seam between software and hardware: an engineering post-mortem}
+Section 7 lists what broke. This section asks a narrower question: of the mistakes the team made, which ones were made \emph{at the boundary} where software written against a simulator met a flight controller, a camera and a radio, and what do they have in common? Four patterns account for nearly all of them.
+
+\subsection{Every boundary crossing carried an unchecked assumption}
+A number crosses from the aircraft into the policy, or from the policy out to the motors, and somewhere along the way its meaning changes. Units, sign, scale, rate. Each of those was assumed at least once and each assumption was wrong at least once.
+
+\begin{itemize}[leftmargin=*]
+\item \textbf{Units.} The gyro arrived in counts and was treated as degrees per second, a factor of 16.384 (Section 6.2). The evidence had been sitting in a log for three days: a peak reading of 4894 that no aircraft could produce in degrees per second.
+\item \textbf{Sign.} Pitch was carried the wrong way by every runner until the last day. A teammate's position-hold controller had the same inversion, and its unit test passed because the test's toy plant used the same wrong sign; the loop was checked against a mirror of its own error. Yaw was then derived from the gyro when the attitude message said the opposite.
+\item \textbf{Scale.} The policy's rate envelope (183$^\circ$/s) and the flight controller's (440$^\circ$/s) were different sizes, and the curve joining them was not a line. Mapping one linearly onto the other gave a loop gain from 0.62 to 2.40 (Section 6.4). Every runner on the stack inherited the same map.
+\item \textbf{Rate.} The policies trained at 60 Hz because that was the simulator's default. The link's 40 Hz ceiling was measured on the fourth day on site (Section 6.1), and the retrained policies arrived on the last.
+\item \textbf{Contract width and hover point.} A hover policy expecting 198 inputs was documented as expecting 192; a 0.255 hover stick baked into one runner was self-consistent for its own policy and would have broken both the throttle map and the velocity integrator of a policy trained to 0.225, producing about 5.6 m/s of phantom sink. Neither was a bug until a different checkpoint was dropped in.
+\end{itemize}
+The common thread is that none of these values was \emph{read off the artefact}. They were read off documents, defaults and memory. Reading the gyro scale took a person rotating the airframe for three seconds; reading the rate profile took one MSP request. Both were done on day five.
+
+\subsection{Checks that shared a cause with the thing they checked}
+The team was not short of tests. It was short of tests that could fail.
+
+\begin{table}[htbp]\centering\small
+\begin{tabular}{@{}p{0.28\linewidth}p{0.32\linewidth}p{0.32\linewidth}@{}}
+\toprule
+The check & Why it could not fail & What it hid \\ \midrule
+Auto-labeller accuracy, 0.75 px & scored against the geometric model the labeller solves for & 4.36 px against humans (Section 4.5) \\
+Detector mAP on a random split, 0.90 & neighbouring frames are near-duplicates & 0.283 on contiguous blocks (Section 4.4) \\
+The hover logger's stability gate & it gated on a vertical-speed field that read 0.000 in every sample & a ``hover throttle'' of 9.8\% from an aircraft sitting on the floor (Section 6.5) \\
+The smoke test's exit code & Isaac Sim's shutdown hard-exits before \texttt{sys.exit}, so the shell always saw 0 & a broken plant would have been green-lit for training (Section 5.5) \\
+A position-hold unit test & the test plant used the same inverted pitch sign as the controller & a 0.30 m error growing to 14.9 m in 20 s under the true convention \\
+The organizers' IMU check & ``near zero at rest'' and ``responds to motion'' both pass with a 16$\times$ scale error & the gyro units (Section 6.2) \\
+Corner visibility at the default threshold & detection rate was measured, corner availability was not & a policy that could act 36\% of the time (Section 4.6) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The remedy in every row is the same: a second, independent route to the answer. Humans for the labeller, a bench rotation for the gyro, an authoritative \texttt{SMOKE\_RESULT=} line grepped from stdout instead of a return code, a structural test that parses the source to prove shadow mode cannot transmit. Where the team built those, they held.
+
+\subsection{The order of operations}
+The bring-up ladder was written down early: bench, then props-off handover, then tethered hover, then a gate. It was then climbed out of order. The props-off handover check, which proves that flipping the override switch off returns the aircraft to the pilot, is the abort path, and it was deferred on the last day by choice while four of the things it guards changed the same night. The first props-on policy flight went to an aircraft carrying the 2.4$\times$ rate map and an inverted pitch axis; the audit that found both was written after the wall. The plan for the scored day was a single competition run with no bench run before it.
+
+Some of that was time. Some of it was structure. Three people built three runners with three enablement sequences (ACRO with the override switch first, ANGLE with arming first, ANGLE in every switch position), and the shared documents adopted each in turn. Constants that were correct inside one runner were copied into another where they were not. The team's own briefing notes that it ``leans heavily on AI coding agents'' and that ``some decisions live only in chat history''; the on-site working tree and the committed copy drifted, and a rule had to be written to keep them in step. A piece of software that has to be right about a piece of hardware needs one owner for each number, and that ownership was never assigned.
+
+\subsection{Interlocks that were documented but not enforced}
+The dangerous behaviours of the flight controller were all known before they cost anything. They were written in the firmware source and in the team's research notes. What was missing was code that made them impossible.
+
+\begin{itemize}[leftmargin=*]
+\item The MSP stick buffer starts at zero and zero means a dead receiver. Every runner therefore had to stream valid frames before the switch moved. The first runners did not; the switch ``killed'' the aircraft; and the rule was learned from the aircraft rather than enforced by the runner.
+\item A stopped stream leaves the last command in force forever. Every fault path that exits the process is therefore a fault path that keeps the motors at their last setting. The team's rule became ``leave the process running until the aircraft is landed''; a runner that keeps streaming a descent on every exception would have made the rule unnecessary.
+\item Two MSP clients on one flight controller hang it, and a configurator session sets an arming-disable flag on its own port that blocks the pilot invisibly. Both were learned by losing a session.
+\item The read and write orders of the RC channels differ (\texttt{MSP\_RC} returns yaw before throttle; \texttt{MSP\_SET\_RAW\_RC} takes AETR). A bench tool read AUX5 from the slot that holds AUX3, so the one test whose subject was the override switch was displaying the wrong switch.
+\item The aircraft came up armed twice with the ARM switch already down, and a Betaflight reset occurred once. A power-on checklist existed on paper.
+\end{itemize}
+The cheapest fix for all of these is the same shape: a preflight that reads the aircraft's state, refuses to continue if any of the known traps is armed, and prints what it saw. The team wrote one late on 21 September, with a hash of every file that decides what the aircraft would do, so that any change re-opens the handover check. It never flew.
+
+\subsection{What a second attempt would build first}
+In order, and before any policy is trained:
+
+\begin{enumerate}[leftmargin=*]
+\item A bench tool that reads every constant the runner depends on directly from the aircraft, including gyro scale, rate profile, throttle curve, channel map, arming flags and link timing with the stream running, and writes them into the one configuration file the runner is allowed to read.
+\item A props-off handover test bound to a hash of that file and of the runner, run by whoever changed either, with a green line that a human can read at the flight line.
+\item A runner whose only exit path is a streamed descent, and which refuses to start if the aircraft is armed, another client is attached, or the override switch is already engaged.
+\item One owner per number, one runner, and a change log that lives in the repository rather than a chat.
+\item Only then a simulator decimation set to the measured link rate, and only then training.
+\end{enumerate}
 \section{Discussion}
 \textbf{Measure the plant before you train against it.} The stress study had ranked latency and thrust calibration above every other error source before the team reached the hall. The aircraft then delivered both surprises in exactly that order: a link half as fast as assumed, and a hover throttle never measured in free air. Five minutes with a scale and a stopwatch on day one would have been worth more than any training run.
 
@@ -204,7 +266,7 @@ What would have had to be true for a scored run? The list is short, and none of 
 
 \textbf{The failure modes that grounded the fleet were not the ones the simulator studied.} Figure 8 contains no wedged flight controller, no zero stick buffer tripping failsafe, no mislabelled transmitter switch, no aircraft arming itself on power-up. Each of those is documented in the firmware source. Each cost an aircraft or a session. Each was preventable by a props-off bench procedure the team wrote and then, under time pressure, skipped.
 
-\textbf{Defaults are decisions.} A keypoint threshold of 0.5; a reprojection cap of 2 px; a linear stick map; \texttt{np.radians} on raw counts; a mass applied to every link. Nobody chose any of them, and all of them were flying. The habit that helped most was to read a value off the artefact rather than the document, then write down where every number came from and how far to trust it.
+\textbf{Defaults are decisions.} A keypoint threshold of 0.5, a reprojection cap of 2 px, a linear stick map, \texttt{np.radians} on raw counts, a mass applied to every link: nobody chose any of them, and all of them were flying. Section 8.1 lists what reading them off the artefact would have cost.
 
 \textbf{What we would do next time}, in order. Weigh the aircraft, and measure hover throttle and thrust-to-weight from RPM on day one, in the cage. Measure the link rate with the stream running and set the simulator's decimation to match before renting a GPU. If the rules allow it, put a downward range sensor on the Jetson, because every hover design here died for want of height. Hand-label a hundred real frames before training anything. And never fly a runner whose handover check has not passed since the last change.
 
