@@ -25,7 +25,8 @@ not LFS):
 
 ## Rebuilding it
 
-    python3 make_figures.py     # regenerates figures/ from the numbers and logs cited in the paper
+    python3 make_figures.py     # regenerates the charts from the numbers and logs cited in the paper
+    python3 make_figures_extra.py   # the system diagram, timeline, label funnel, stress causes, contract layout
     python3 build_pdf.py        # paper.md -> paper.html -> paper.pdf (needs the `markdown` package and Google Chrome)
     python3 md2tex.py && (cd neurips && pdflatex paper.tex && pdflatex paper.tex)   # the NeurIPS-style PDF
 
@@ -52,4 +53,8 @@ renders on GitHub without them.
 | `stack_sim_paths.png` | the classical fallback stack flown in Isaac, 21 Sep |
 | `race_contact_sheet.jpg` | the racing policy's onboard camera in Isaac, 20 Sep |
 | `video_posters.png`, `poster_*.jpg` | one frame from each recording in `videos/` (extracted with OpenCV) |
+| `system_diagram.png`, `project_timeline.png`, `observation_contract.png` | drawn from the documents: the chain from camera to motors with measured rates, the four-month timeline with the on-site week, the 55 x 32 observation layout (`make_figures_extra.py`) |
+| `autolabel_funnel.png` | `datasets/autolabel/report.csv` and `datasets/hybrid/report.csv` in the flight repo (2467 candidates, 1917 hybrid labels) |
+| `stress_causes.png` | the 28 stress-scenario JSONs under `analysis/2026-09-16/experiments/results/stress/` |
+| `race40drop_first_lap.png` | the race40drop first-lap figure from the pod session of 21 Sep (36 of 64 aircraft completed the lap); the original file did not survive the pod, this is the team's copy |
 | `stack_pov.gif` | ten seconds of `stack_run_02.mp4` at 8 fps, for inline display on GitHub (OpenCV frames, Pillow GIF) |

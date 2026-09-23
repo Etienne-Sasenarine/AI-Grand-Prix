@@ -96,7 +96,7 @@ while i < n:
         while j < n and not src[j].strip(): j += 1
         cap = src[j].strip().strip("*") if j < n and src[j].startswith("*Figure") else ""
         cap = re.sub(r"^Figure \d+\.\s*", "", cap)
-        h = "0.55\\textheight" if img.endswith(("course_overlay.png", "race_contact_sheet.jpg", "video_posters.png")) else "0.40\\textheight"
+        h = "0.60\\textheight" if img.endswith(("course_overlay.png", "race_contact_sheet.jpg", "video_posters.png", "race40drop_first_lap.png", "project_timeline.png", "stress_causes.png", "observation_contract.png")) else "0.42\\textheight"
         tex.append(r"\begin{figure}[htbp]\centering\includegraphics[width=\linewidth,height=" + h + r",keepaspectratio]{" + img + "}")
         tex.append(r"\caption{" + inline(cap) + "}\end{figure}")
         i = j
