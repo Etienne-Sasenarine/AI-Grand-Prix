@@ -59,7 +59,8 @@ utils/        the torch observation builder, camera latch and delay line,
 assets/       drone and gate USD (Git LFS); the gate is built by tools/
 scripts/rl/   train.py, play.py, diagnose.py
 scripts/diag/ checkpoint diagnostics: spawn, takeoff, collisions, robustness,
-              hover stress, video recorders
+              hover stress, video recorders (record_race_pov.py films chase view
+              beside the onboard camera with the policy's own corners drawn)
 scripts/pod/  RunPod launchers, chains, sweeps, checkpoint puller
 scripts/      smoke_test.py, bench_throughput.py
 tools/        gate asset builder, field-measurement worksheet
