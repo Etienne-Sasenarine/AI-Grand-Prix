@@ -1,0 +1,2 @@
+# Plain files, not LFS: two 9 MB checkpoints that the paper and the recorders depend on.
+*.pt -filter -diff -merge

@@ -116,10 +116,18 @@ there, is [`docs/RUNBOOK_RUNPOD.md`](docs/RUNBOOK_RUNPOD.md).
 
 ## Checkpoints
 
-Not in this repo. They are large, reproducible in under an hour and under a
-dollar (`docs/RUNBOOK_RUNPOD.md`, Part 2), and only meaningful with the
-`contract.json` beside them. The chains' best checkpoints from 21 Sep and what
-each scored are listed in [`docs/TRAINING_RESULTS.md`](docs/TRAINING_RESULTS.md).
+Two are in [`checkpoints/`](checkpoints/): the 40 Hz racing chains' best,
+`race40_best_agent.pt` (perfect corners, 15.27 gates/episode) and
+`race40drop_best_agent.pt` (trained under the measured corner dropout, 10.23),
+the ones the paper reports. They are plain 9 MB files, not LFS, and predate
+`contract.json` stamping. Everything else is reproducible in under an hour and
+under a dollar (`docs/RUNBOOK_RUNPOD.md`, Part 2); what each chain scored is in
+[`docs/TRAINING_RESULTS.md`](docs/TRAINING_RESULTS.md).
+
+To film either one, chase view beside the onboard camera with the policy's
+corners and the real detector's drawn: `scripts/diag/record_race_pov.py`, or on
+a Windows machine with the Isaac venv, `scripts\windows\record_race_pov.ps1`
+end to end.
 
 ## State, honestly
 
