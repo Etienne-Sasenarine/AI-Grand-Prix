@@ -1,10 +1,18 @@
 """Record the racing policy the way the stack recordings were made: chase | onboard.
 
 Left: Isaac's chase view of the aircraft. Right: the drone's own tiled camera
-(640x360, the calibrated lens, 20 deg up-tilt) with the corners the policy is
-actually being fed drawn on top -- the last frame of its observation history,
-so what is painted is exactly what the network saw that step, dropout and
-delay included. A status line carries time, gates passed, speed and height.
+(640x360, the calibrated lens, 20 deg up-tilt) with two overlays in the same
+style as the stack recordings:
+
+  green  the target gate's corners as the policy is actually fed them -- the
+         last frame of its observation history, so exactly what the network
+         saw that step, latch, delay and dropout included; an edge is drawn
+         only when both of its corners are visible
+  cyan   (with --detector) every gate the real hand497 ONNX detector finds on
+         the same rendered frame, corners and box confidence, so the
+         perception side can be judged against the policy's input
+
+A status line carries time, gates passed, speed and height.
 
 Built from scripts/diag/record_start.py (policy loading, pad starts, the
 skrl reset trap, baked-in speed-up) and the perception-sim branch's
@@ -19,7 +27,14 @@ line, not the exit code, says whether it worked.
 
 AIGP_POLICY_HZ must match the checkpoint (40 for race40/race40drop). Set the
 dropout variables to film the policy under the measured detector, leave them
-unset for perfect corners.
+unset for perfect corners. For the cyan overlay add
+
+        --detector /workspace/aigp-perception/models/gate_pose_hand497.onnx \\
+        --perception-repo /workspace/aigp-perception
+
+(needs `pip install onnxruntime-gpu` or `onnxruntime` on the pod). The
+detector was trained on real gates, not renders; how well it fires on Isaac's
+orange squares is itself one of the things worth seeing.
 """
 
 from __future__ import annotations
@@ -38,6 +53,10 @@ parser.add_argument("--seconds", type=float, default=40.0, help="cut each attemp
 parser.add_argument("--speed", type=float, default=1.0, help="playback multiple, baked in by dropping frames")
 parser.add_argument("--out", default="/workspace/videos/race_pov")
 parser.add_argument("--ml_framework", default="torch")
+parser.add_argument("--detector", default=None, help="hand497 .onnx; draws what the real detector sees in cyan")
+parser.add_argument("--perception-repo", default="/workspace/aigp-perception", help="checkout of bojro/aigp-perception")
+parser.add_argument("--detector-conf", type=float, default=0.4)
+parser.add_argument("--detector-kpt-conf", type=float, default=0.25)
 AppLauncher.add_app_launcher_args(parser)
 args, hydra_args = parser.parse_known_args()
 sys.argv = [sys.argv[0]] + hydra_args
@@ -63,16 +82,48 @@ import tasks  # noqa: E402,F401
 from utils.keypoint_overlay import annotate_rgb  # noqa: E402
 
 HISTORY = 32
+GREEN, CYAN = (60, 230, 60), (60, 220, 230)     # RGB, matching the stack recordings' legend
+
+try:
+    import cv2  # noqa: E402
+except ImportError:  # the overlay degrades to the NumPy-only annotate_rgb
+    cv2 = None
 
 
-def _text(img: np.ndarray, s: str, y: int) -> None:
-    """Status text without depending on OpenCV inside Isaac; falls back to nothing."""
-    try:
-        import cv2  # noqa: PLC0415
+def _text(img: np.ndarray, s: str, y: int, scale: float = 0.45) -> None:
+    if cv2 is not None:
+        cv2.putText(img, s, (6, y), cv2.FONT_HERSHEY_SIMPLEX, scale, (255, 255, 255), 1, cv2.LINE_AA)
 
-        cv2.putText(img, s, (6, y), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), 1, cv2.LINE_AA)
-    except ImportError:
-        pass
+
+def draw_gate(img: np.ndarray, uv: np.ndarray, visible: np.ndarray, colour) -> None:
+    """Corner dots plus each ring's edges, an edge only where both corners were seen."""
+    for (u, v), vis in zip(uv, visible):
+        if vis:
+            cv2.circle(img, (int(round(u)), int(round(v))), 4, colour, -1)
+    for base in (0, 4):
+        for a in range(4):
+            i, j = base + a, base + (a + 1) % 4
+            if visible[i] and visible[j]:
+                cv2.line(img, tuple(int(round(x)) for x in uv[i]), tuple(int(round(x)) for x in uv[j]),
+                         colour, 1, cv2.LINE_AA)
+
+
+def policy_corners(frame_obs: np.ndarray, w: int, h: int):
+    """The target gate as the policy is fed it: 16 normalised coords then 8 visibility flags."""
+    uv = frame_obs[:16].reshape(8, 2) * np.array([w, h], dtype=np.float32)
+    visible = frame_obs[16:24] > 0.5
+    return uv, visible
+
+
+def load_detector():
+    if args.detector is None:
+        return None
+    sys.path.insert(0, os.path.join(args.perception_repo, "deploy", "onnx"))
+    from gate_detector import GateDetector  # noqa: PLC0415
+
+    det = GateDetector(args.detector, conf=args.detector_conf, kpt_conf=args.detector_kpt_conf)
+    print(f"  detector {os.path.basename(args.detector)} on {det.provider}", flush=True)
+    return det
 
 
 def main() -> int:
@@ -115,6 +166,7 @@ def main() -> int:
 
     import imageio.v2 as imageio  # noqa: PLC0415
 
+    detector = load_detector()
     skip = max(1, int(round(args.speed)))
     out_fps = int(round(policy_hz))
     steps = int(args.seconds * policy_hz)
@@ -132,8 +184,25 @@ def main() -> int:
                         flat = obs[0].detach().cpu().numpy().reshape(-1)
                         frame_dim = flat.size // HISTORY          # 51 for v1, 55 for v2
                         current = flat[-frame_dim:]              # the newest frame is last
-                        fpv = cam.data.output["rgb"][0].cpu().numpy()[..., :3]
-                        fpv = annotate_rgb(fpv, current)
+                        fpv = cam.data.output["rgb"][0].cpu().numpy()[..., :3].astype(np.uint8).copy()
+                        if cv2 is None:
+                            fpv = annotate_rgb(fpv, current)
+                        else:
+                            h, w = fpv.shape[:2]
+                            n_det = 0
+                            if detector is not None:
+                                for g in detector.detect(fpv[..., ::-1]):   # detector wants BGR
+                                    draw_gate(fpv, g.keypoints, g.kpt_visible, CYAN)
+                                    x1, y1 = g.box[:2]
+                                    cv2.putText(fpv, f"{g.conf:.2f}", (int(x1), max(12, int(y1) - 4)),
+                                                cv2.FONT_HERSHEY_SIMPLEX, 0.4, CYAN, 1, cv2.LINE_AA)
+                                    n_det += 1
+                            uv, vis = policy_corners(current, w, h)
+                            draw_gate(fpv, uv, vis, GREEN)
+                            legend = f"green = corners the policy is fed ({int(vis.sum())}/8)"
+                            if detector is not None:
+                                legend += f"   cyan = {os.path.basename(args.detector)} on this frame ({n_det} gates)"
+                            _text(fpv, legend, 18, 0.4)
                         chase = np.asarray(env.render())[..., :3].astype(np.uint8)
                         if chase.shape[:2] != fpv.shape[:2]:
                             try:
