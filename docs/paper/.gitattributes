@@ -3,3 +3,4 @@
 *.jpg -filter -diff -merge
 *.pdf -filter -diff -merge
 *.mp4 -filter -diff -merge
+*.gif -filter -diff -merge

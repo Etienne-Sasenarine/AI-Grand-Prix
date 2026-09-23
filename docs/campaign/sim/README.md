@@ -14,6 +14,10 @@ the on-site work live in
 [`bojro/aigp-perception`](https://github.com/bojro/aigp-perception).
 The write-up of the whole project is in [paper/](paper/).
 
+![The classical fallback stack in Isaac: chase view on the left, the drone's own camera with detections on the right](paper/figures/stack_pov.gif)
+
+*The classical fallback stack flown in Isaac against a pessimistic sensor model: chase view on the left, the drone's own camera on the right with the simulated detector's corners drawn. Full recordings, and the racing policy's, are in [paper/videos/](paper/videos/).*
+
 ## The aircraft and the course
 
 The drone is **not** a 5-inch racing quad. It is the organizer-supplied Neros

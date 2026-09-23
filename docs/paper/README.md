@@ -1,5 +1,9 @@
 # The paper
 
+![](figures/stack_pov.gif)
+
+*Ten seconds of `videos/stack_run_02.mp4`: the classical fallback stack in Isaac, chase view (left) and the drone's own camera with the simulated detector's corners (right). The five full recordings are listed below.*
+
 `paper.md` is the write-up of the whole AI Grand Prix physical-qualifier effort:
 the perception pipeline, the simulator and training stack, the measurements
 taken on the aircraft, and the sequence of failures that ended the attempt.
@@ -48,3 +52,4 @@ renders on GitHub without them.
 | `stack_sim_paths.png` | the classical fallback stack flown in Isaac, 21 Sep |
 | `race_contact_sheet.jpg` | the racing policy's onboard camera in Isaac, 20 Sep |
 | `video_posters.png`, `poster_*.jpg` | one frame from each recording in `videos/` (extracted with OpenCV) |
+| `stack_pov.gif` | ten seconds of `stack_run_02.mp4` at 8 fps, for inline display on GitHub (OpenCV frames, Pillow GIF) |
