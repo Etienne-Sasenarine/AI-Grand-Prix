@@ -1,50 +1,63 @@
 # aigp-sim
 
-The simulator half of team Electric Fire's entry to the AI Grand Prix physical
-qualifier (Santa Ana, 15–22 Sep 2026): an Isaac Sim / Isaac Lab / skrl PPO
-stack that trains a policy to fly the organizer's ten-gate hall course from
-projected gate corners plus IMU, and to hover in front of a gate. The policy
-emits four numbers, collective thrust and three body rates, which a Jetson
-Orin NX on the aircraft sends to a Betaflight flight controller over MSP.
+**The simulator and policy-training half of Team Electric Fire's entry to the AI Grand Prix physical qualifier** (Anduril LC3, Santa Ana, 15–22 September 2026). An Isaac Sim / Isaac Lab / skrl PPO stack that trains a policy to fly the organizer's ten-gate hall course from projected gate corners plus IMU, and to hover in front of a gate. The policy emits four numbers, collective thrust and three body rates, which a Jetson Orin NX on the aircraft streams to a Betaflight flight controller over MSP.
 
-This repo is only the training stack. The flight client, the MSP runner and
-the on-site work live in
-[`Code-Red-Cables/AI_GP`](https://github.com/Code-Red-Cables/AI_GP)
-(`pq/flight/onboard/`); the gate-corner detector and its training live in
-[`bojro/aigp-perception`](https://github.com/bojro/aigp-perception).
-The write-up of the whole project is in [paper/](paper/).
+The whole project, across all three repositories, is written up in **[the paper](paper/paper.md)** ([PDF](paper/paper.pdf), NeurIPS style). Read that first if you want the story; read on if you want to run the code.
 
-![The classical fallback stack in Isaac: chase view on the left, the drone's own camera with detections on the right](paper/figures/stack_pov.gif)
+![The 40 Hz racing policy trained under corner dropout flying the full course in Isaac from the competition pad: 36 of 64 aircraft completed the first lap](paper/figures/race40drop_first_lap.png)
 
-*The classical fallback stack flown in Isaac against a pessimistic sensor model: chase view on the left, the drone's own camera on the right with the simulated detector's corners drawn. Full recordings, and the racing policy's, are in [paper/videos/](paper/videos/).*
+*The 40 Hz racing policy trained under measured corner dropout (`race40drop`) flying the course in Isaac from the competition pad. 36 of 64 aircraft completed the first lap. Every path in blue, one aircraft coloured by height; right, height over the lap and when each gate was passed.*
 
-## The aircraft and the course
+![Ten seconds of the classical fallback stack in Isaac: chase view on the left, the drone's own camera with detections on the right](paper/figures/stack_pov.gif)
 
-The drone is **not** a 5-inch racing quad. It is the organizer-supplied Neros
-Archer B2: 8-inch props at 4.1 pitch, Betaflight 4.4.3 on an H743 board, a
-Jetson Orin NX 16 GB, **1745 g** all-up race weight measured on site. The
-`assets/5_in_drone/` USD and its 0.6 kg URDF are geometry inherited from the
-upstream `isaac_drone_racer` project; mass, inertia and thrust are overridden
-at startup to this airframe (`docs/PLANT.md`).
+*The classical fallback stack under a pessimistic sensor model, chase view beside the drone's own camera with the simulated detector's corners drawn. All recordings, including the racing policy's, are in [paper/videos/](paper/videos/).*
 
-The course is ten gates from the organizer's coordinate table; gate 9 is a
-stacked double gate flown through twice per lap, so a lap is **11 crossings**
-and a scored two-lap run is 22. The simulator's 11 track entries are those
-crossings.
+## Results at a glance
+
+| | | scored under |
+|---|---|---|
+| Racing, `race40` | **15.27 gates / episode** | perfect corners |
+| Racing, `race40drop` | **10.23 gates / episode**; 36 of 64 first laps from the pad | corners dropping as the real detector's do |
+| Hover, 40 Hz retrain | **85.5% settled** within 0.30 m, p95 excursion 0.331 m | the control rate the aircraft supports |
+| Pad start to gate 1 | 0 of 456 before the start fixes, **86.3%** after | 256 pad starts |
+| Full racing run | ~48 min, ~$0.70 | 4096 environments, RTX 6000 Ada |
+
+Both racing checkpoints are in [`checkpoints/`](checkpoints/). Nothing trained here flew props-on; the paper's Sections 6 and 7 say why, and what the aircraft measured.
+
+## What is original here, and what is not
+
+The simulator is a fork of [Kousheek Chakraborty's `isaac_drone_racer`](https://github.com/kousheekc/isaac_drone_racer); PPO is skrl's; the tasks follow Isaac Lab's manager pattern. What the team built on top:
+
+* **A hashed observation contract** (`contract/`) shared with the aircraft, so a channel-order mismatch is a refused checkpoint rather than a confident wrong flight.
+* **A plant corrected from measurements**: 1745 g mass distributed across links, inertia estimated for the real airframe and its centre-of-mass tilt fixed, rate-loop gains derived rather than inherited, action delay and setpoint lag, a 30 Hz camera latch with a 1–4 step vision delay.
+* **Corner dropout calibrated on the real detector** (13% missing, 0.81 sticky, measured over 1345 frames at a real gate), which is what `race40drop` trained against.
+* **Starts that match the race**: on the floor at the competition pad, after two silent spawn bugs were found and fixed.
+* **A smoke test whose exit code could not fail**, fixed, and a set of bench diagnostics for checkpoints.
+
+## Start here
+
+1. [`paper/paper.md`](paper/paper.md): the whole effort in one document, figures and videos included.
+2. [`docs/OBSERVATION.md`](docs/OBSERVATION.md): the 55-channel contract, the timing model, every environment variable.
+3. [`docs/PLANT.md`](docs/PLANT.md): what the simulated aircraft is, number by number, and what is not modelled.
+4. [`docs/TRAINING_RESULTS.md`](docs/TRAINING_RESULTS.md): every result with its checkpoint and commit.
+5. [`docs/RUNBOOK_RUNPOD.md`](docs/RUNBOOK_RUNPOD.md): how to run this on a rented GPU, and everything that went wrong the first time.
 
 ## Three commands
 
 ```bash
 python -m pytest -q                                   # 256 pass, no Isaac needed
-python scripts/smoke_test.py --headless               # the plant, on live PhysX; prints SMOKE_RESULT=
+python scripts/smoke_test.py --headless               # the plant on live PhysX; prints SMOKE_RESULT=
 python -u scripts/rl/train.py --task Isaac-Drone-Racer-v0 --headless --num_envs 4096
 python scripts/rl/play.py --task Isaac-Drone-Racer-Play-v0 --num_envs 1 --real-time --checkpoint <run>/checkpoints/best_agent.pt
 ```
 
-Tasks: `Isaac-Drone-Racer-v0` (racing) and `Isaac-Drone-Hover-v0` (station
-keeping 2 m in front of a gate), each with a `-Play-v0` variant that enables
-the camera and starts in front of official gate 1. On a rented box use
-`scripts/pod/train_launch.sh`, which runs the smoke test as a gate first.
+Tasks: `Isaac-Drone-Racer-v0` (racing) and `Isaac-Drone-Hover-v0` (station keeping 2 m in front of a gate), each with a `-Play-v0` variant that enables the camera and starts in front of official gate 1. On a rented box use `scripts/pod/train_launch.sh`, which runs the smoke test as a gate first. To film a checkpoint with the chase view beside the onboard camera, `scripts/diag/record_race_pov.py`, or on a Windows machine with the Isaac venv, `scripts\windows\record_race_pov.ps1` end to end.
+
+## The aircraft and the course
+
+The drone is **not** a 5-inch racing quad. It is the organizer-supplied Neros Archer B2: 8-inch props at 4.1 pitch, Betaflight 4.4.3 on an H743 board, a Jetson Orin NX 16 GB, **1745 g** all-up race weight measured on site. The `assets/5_in_drone/` USD and its 0.6 kg URDF are geometry inherited from upstream; mass, inertia and thrust are overridden at startup to this airframe ([`docs/PLANT.md`](docs/PLANT.md)).
+
+The course is ten gates from the organizer's coordinate table; gate 9 is a stacked double gate flown through twice per lap, so a lap is **11 crossings** and a scored two-lap run is 22. The simulator's 11 track entries are those crossings.
 
 ## Layout
 
@@ -57,42 +70,27 @@ dynamics/     action decode, thrust curve, rate loop, gains derived from inertia
 utils/        the torch observation builder, camera latch and delay line,
               commanded-velocity integrator, gate counter, play HUD, logging
 assets/       drone and gate USD (Git LFS); the gate is built by tools/
+checkpoints/  race40 and race40drop, the two the paper reports, with provenance
 scripts/rl/   train.py, play.py, diagnose.py
 scripts/diag/ checkpoint diagnostics: spawn, takeoff, collisions, robustness,
-              hover stress, video recorders (record_race_pov.py films chase view
-              beside the onboard camera with the policy's own corners drawn)
+              hover stress, video recorders
 scripts/pod/  RunPod launchers, chains, sweeps, checkpoint puller
-scripts/      smoke_test.py, bench_throughput.py
+scripts/      smoke_test.py, bench_throughput.py, windows/
 tools/        gate asset builder, field-measurement worksheet
 tests/        256 tests that run without Isaac; one module needs the training box
-docs/         see below
+docs/         the five documents above, plus the first smoke run's findings
+paper/        the write-up, its figures, videos and build scripts
 ```
 
-The package names (`contract`, `tasks`, `utils`, `dynamics`, `assets`) are
-deliberately unchanged from the vendored `isaac_drone_racer` tree. They are
-imported by name from the pod scripts, from the flight repo's vendored copy of
-`contract/`, and from the perception-stack simulator on the `perception-sim`
-branch of the flight repo; renaming them would break every one of those for a
-cosmetic gain. Isaac Lab itself does not care: the gym ids are registered from
-`tasks/__init__.py` by whatever the package is called.
+The package names (`contract`, `tasks`, `utils`, `dynamics`, `assets`) are deliberately unchanged from the vendored `isaac_drone_racer` tree. They are imported by name from the pod scripts, from the flight repo's vendored copy of `contract/`, and from the perception-stack simulator on the `perception-sim` branch of the flight repo; renaming them would break every one of those for a cosmetic gain. Isaac Lab itself does not care: the gym ids are registered from `tasks/__init__.py` by whatever the package is called.
 
 ## The contract, in three sentences
 
-`utils/aigp_obs.py` here and `race_obs.py` on the aircraft are two
-implementations of one observation vector, and if they disagree by a channel
-order or a clip nothing raises: the policy flies confidently on numbers that
-mean something else. So `contract/` defines the vector, the camera and the
-plant constants once, with no dependencies, and hashes every value both ends
-must agree on (v2, the current contract: `a20c14d6a335`, 55 channels × 32
-frames = 1760). `train.py` stamps the hash into every run as `contract.json`
-and `play.py` refuses a checkpoint whose stamp disagrees with the running
-code. Full channel table, timing model and environment variables:
-[`docs/OBSERVATION.md`](docs/OBSERVATION.md).
+`utils/aigp_obs.py` here and `race_obs.py` on the aircraft are two implementations of one observation vector, and if they disagree by a channel order or a clip nothing raises: the policy flies confidently on numbers that mean something else. So `contract/` defines the vector, the camera and the plant constants once, with no dependencies, and hashes every value both ends must agree on (v2, the current contract: `a20c14d6a335`, 55 channels × 32 frames = 1760). `train.py` stamps the hash into every run as `contract.json` and `play.py` refuses a checkpoint whose stamp disagrees with the running code.
 
 ## Install
 
-Git LFS **before** the first clone, or the 98 MB drone USD arrives as a pointer
-file and Isaac fails with an unhelpful error:
+Git LFS **before** the first clone, or the 98 MB drone USD arrives as a pointer file and Isaac fails with an unhelpful error:
 
 ```bash
 git lfs install
@@ -100,73 +98,26 @@ git clone https://github.com/bojro/aigp-sim && cd aigp-sim
 python -m pytest -q          # 256 passed, without Isaac
 ```
 
-Isaac Sim 4.5, Isaac Lab 2.1.0 and **skrl 1.4.2** (not 2.x; Isaac Lab 2.1 uses
-the 1.x runner API). The tests need only torch and pytest. Two warnings that
-each cost a session:
+Isaac Sim 4.5, Isaac Lab 2.1.0 and **skrl 1.4.2** (not 2.x; Isaac Lab 2.1 uses the 1.x runner API). The tests need only torch and pytest. Two warnings that each cost a session:
 
-* **The A100 is the wrong card.** GA100 is the one Ampere die without RT
-  cores and Isaac Sim needs a Vulkan device even headless. L40S, RTX 6000 Ada,
-  A10G or a 4090 all work.
-* **On Linux, export `LD_LIBRARY_PATH`** (WSL: `/usr/lib/wsl/lib`) before
-  training, or PhysX cannot find `libcuda.so`, silently falls back to the CPU
-  solver, and runs ~100× slower while appearing to work.
-
-The step-by-step for a rented box, and everything that went wrong getting
-there, is [`docs/RUNBOOK_RUNPOD.md`](docs/RUNBOOK_RUNPOD.md).
-
-## Checkpoints
-
-Two are in [`checkpoints/`](checkpoints/): the 40 Hz racing chains' best,
-`race40_best_agent.pt` (perfect corners, 15.27 gates/episode) and
-`race40drop_best_agent.pt` (trained under the measured corner dropout, 10.23),
-the ones the paper reports. They are plain 9 MB files, not LFS, and predate
-`contract.json` stamping. Everything else is reproducible in under an hour and
-under a dollar (`docs/RUNBOOK_RUNPOD.md`, Part 2); what each chain scored is in
-[`docs/TRAINING_RESULTS.md`](docs/TRAINING_RESULTS.md).
-
-To film either one, chase view beside the onboard camera with the policy's
-corners and the real detector's drawn: `scripts/diag/record_race_pov.py`, or on
-a Windows machine with the Isaac venv, `scripts\windows\record_race_pov.ps1`
-end to end.
+* **The A100 is the wrong card.** GA100 is the one Ampere die without RT cores and Isaac Sim needs a Vulkan device even headless. L40S, RTX 6000 Ada, A10G or a 4090 all work.
+* **On Linux, export `LD_LIBRARY_PATH`** (WSL: `/usr/lib/wsl/lib`) before training, or PhysX cannot find `libcuda.so`, silently falls back to the CPU solver, and runs ~100× slower while appearing to work.
 
 ## State, honestly
 
-* **Latency is modelled**: 0–2 policy steps of action delay, a first-order lag
-  on the rate setpoint matching the FC's measured 15 Hz setpoint filter, and a
-  1–4 step vision delay behind a 30 Hz camera latch, all randomised per
-  episode.
-* **Corner dropout is calibrated** to 1345 frames at a real gate (13% missing,
-  4.2% frame-to-frame flip, clustered), opt-in via `AIGP_KP_DROP` /
-  `AIGP_KP_STICKY`. Corner *misplacement* (`AIGP_KP_JITTER_PX`) is not
-  calibrated and defaults to 0.
+* **Latency is modelled**: 0–2 policy steps of action delay, a first-order lag on the rate setpoint matching the FC's measured 15 Hz setpoint filter, and a 1–4 step vision delay behind a 30 Hz camera latch, all randomised per episode.
+* **Corner dropout is calibrated**; corner *misplacement* (`AIGP_KP_JITTER_PX`) is not, and defaults to 0.
 * **Mass is measured; inertia is estimated** and not randomised.
-* **No motor model.** Thrust and moments apply directly; the rate loop is
-  slower than a real Betaflight loop, in the conservative direction.
-* **The policy rate matters.** The Jetson can only close the loop at 40 Hz; a
-  60 Hz policy loses a third of its settled time there, and both tasks accept
-  `AIGP_POLICY_HZ` / `AIGP_HOVER_HZ` to train at the rate they will fly.
-* **Three asset files are broken LFS pointers** whose content is gone from the
-  upstream remote. Nothing loads them
-  ([`assets/BROKEN_LFS_OBJECTS.md`](assets/BROKEN_LFS_OBJECTS.md)).
-* **Nothing here exports to the Jetson.** The NumPy export of a checkpoint and
-  the runner that flies it live in the flight repo under `pq/flight/onboard/`.
-* **Nothing trained here has flown props-on.** See the paper.
+* **No motor model.** Thrust and moments apply directly; the rate loop is slower than a real Betaflight loop, in the conservative direction.
+* **The policy rate matters.** The Jetson closes the loop at 40 Hz; a 60 Hz policy loses a third of its settled time there. Both tasks accept `AIGP_POLICY_HZ` / `AIGP_HOVER_HZ` to train at the rate they will fly.
+* **Three asset files are broken LFS pointers** whose content is gone from the upstream remote. Nothing loads them ([`assets/BROKEN_LFS_OBJECTS.md`](assets/BROKEN_LFS_OBJECTS.md)).
+* **Nothing here exports to the Jetson.** The NumPy export of a checkpoint and the runner that flies it live in the flight repo under `pq/flight/onboard/`.
 
-## Documents
+## The other two repositories
 
-| | |
-|---|---|
-| [`docs/OBSERVATION.md`](docs/OBSERVATION.md) | the contract: channels, versions, timing, dropout, hash, env vars |
-| [`docs/PLANT.md`](docs/PLANT.md) | mass, inertia, thrust curve, rate loop, latency, camera, and what is not modelled |
-| [`docs/TRAINING_RESULTS.md`](docs/TRAINING_RESULTS.md) | every number, with its checkpoint and commit |
-| [`docs/RUNBOOK_RUNPOD.md`](docs/RUNBOOK_RUNPOD.md) | the rented-GPU procedure, run sizing, failure catalogue |
-| [`docs/FINDINGS_2026-09-20.md`](docs/FINDINGS_2026-09-20.md) | the first live smoke run: the 5× mass, the 7° inertia tilt, the step-one flyaway |
-| [`assets/BROKEN_LFS_OBJECTS.md`](assets/BROKEN_LFS_OBJECTS.md) | the three unrecoverable pointer files |
+* [`bojro/aigp-perception`](https://github.com/bojro/aigp-perception): the gate-corner detector, its labelling pipeline and the two shipped models.
+* [`Code-Red-Cables/AI_GP`](https://github.com/Code-Red-Cables/AI_GP) (private): the flight client, the MSP runner and the on-site work under `pq/`.
 
 ## Lineage and licence
 
-Forked from Kousheek Chakraborty's
-[`isaac_drone_racer`](https://github.com/kousheekc/isaac_drone_racer)
-(BSD-3-Clause, `LICENSE`) via the team's `AI_GP/isaac_drone_racer/`, and split
-out on 20 Sep 2026 because a rented GPU box should clone the thing it is going
-to run, not 1.5 GB of run logs, the flight client and the competition PDFs.
+Forked from Kousheek Chakraborty's [`isaac_drone_racer`](https://github.com/kousheekc/isaac_drone_racer) (BSD-3-Clause, `LICENSE`) via the team's `AI_GP/isaac_drone_racer/`, and split out on 20 September 2026 because a rented GPU box should clone the thing it is going to run, not 1.5 GB of run logs, the flight client and the competition PDFs. Team Electric Fire: Bojro Das, Geneustace Wicaksono, Etienne Sasenarine, John Apessos, Grant Lin, Rocky Shao.
