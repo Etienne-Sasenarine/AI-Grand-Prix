@@ -10,7 +10,7 @@ STY = "neurips_2025" if os.path.exists(os.path.join(HERE, "neurips", "neurips_20
 
 SPECIAL = {"×": r"$\times$", "°": r"$^\circ$", "≈": r"$\approx$", "±": r"$\pm$", "→": r"$\rightarrow$", "≥": r"$\geq$", "≤": r"$\leq$",
            "µ": r"$\mu$", "⁻⁶": r"$^{-6}$", "−": "--", "–": "--", "—": "---", "…": r"\ldots{}", "’": "'", "‘": "`", "“": "``", "”": "''",
-           "√": r"$\surd$", "★": "*"}
+           "√": r"$\surd$", "★": "*", "¹": r"$^{1}$", "²": r"$^{2}$", "·": r"$\cdot$"}
 def esc(t):
     t = t.replace("\\", r"\textbackslash{}")
     for a, b in [("&", r"\&"), ("%", r"\%"), ("$", r"\$"), ("#", r"\#"), ("_", r"\_"), ("{", r"\{"), ("}", r"\}"), ("~", r"\textasciitilde{}"), ("^", r"\textasciicircum{}")]:
@@ -51,7 +51,8 @@ src = open(os.path.join(HERE, "paper.md"), encoding="utf-8").read().split("\n")
 title = src[0].lstrip("# ").strip()
 authors = re.sub(r"\*\*", "", src[2]).strip()
 affil = src[3].strip()
-i = 4
+event = src[4].strip()
+i = 5
 while not src[i].startswith("## Abstract"): i += 1
 i += 1
 abstract = []
@@ -71,7 +72,10 @@ tex.append(r"\graphicspath{{../figures/}}")
 tex.append(r"\hypersetup{colorlinks=true,linkcolor=black,citecolor=black,urlcolor=blue!60!black}")
 tex.append(r"\title{" + inline(title) + "}")
 names = [n.strip() for n in authors.split(",")]
-tex.append(r"\author{" + (r" \And ".join(inline(n) for n in names[:3])) + r" \AND " + (r" \And ".join(inline(n) for n in names[3:])) + r" \AND " + r" \\ ".join(inline(x) for x in affil.split(", AI Grand Prix")).replace(r"\\ ", r"\\ AI Grand Prix", 1) + "}")
+rows = [names[:4], names[4:]]
+tex.append(r"\author{" + r" \AND ".join(r" \And ".join(inline(n) for n in row) for row in rows if row)
+           + r" \AND \normalfont " + r" \\ ".join(inline(x.strip()) for x in affil.split("·"))
+           + r" \\[4pt] " + r" \\ ".join(inline(x.strip()) for x in event.split(", AI Grand Prix", 1)).replace(r" \\ ", r" \\ AI Grand Prix ", 1) + "}")
 tex.append(r"\begin{document}\maketitle")
 tex.append(r"\begin{abstract}" + "\n" + inline(" ".join(abstract)) + "\n" + r"\end{abstract}")
 if front: tex.append(r"\begin{center}\small " + r" \\ ".join(inline(l) for l in front) + r"\end{center}")

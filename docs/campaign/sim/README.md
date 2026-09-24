@@ -173,4 +173,4 @@ A recording of the current policy (`race40drop`) racing, side by side with its o
 
 ## Lineage and licence
 
-Forked from Kousheek Chakraborty's [`isaac_drone_racer`](https://github.com/kousheekc/isaac_drone_racer) (BSD-3-Clause, `LICENSE`) via our `AI_GP/isaac_drone_racer/`, and split out on 20 September 2026 because a rented GPU box should clone the thing it is going to run, not 1.5 GB of run logs, the flight client and the competition PDFs. We are Team Electric Fire: Bojro Das, Geneustace Wicaksono, Etienne Sasenarine, John Apessos, Grant Lin, Rocky Shao.
+Forked from Kousheek Chakraborty's [`isaac_drone_racer`](https://github.com/kousheekc/isaac_drone_racer) (BSD-3-Clause, `LICENSE`) via our `AI_GP/isaac_drone_racer/`, and split out on 20 September 2026 because a rented GPU box should clone the thing it is going to run, not 1.5 GB of run logs, the flight client and the competition PDFs. We are Team Electric Fire, Cornell University: Bojro Das (College of Arts and Sciences), Geneustace Wicaksono, Etienne Sasenarine, John Apessos, Grant Lin, Aaron Legg and Narayan Topalli (College of Engineering).
