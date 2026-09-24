@@ -2,7 +2,7 @@
 
 **The simulator and policy-training half of our entry to the AI Grand Prix physical qualifier** (Team Electric Fire; Anduril LC3, Santa Ana, 15–22 September 2026). An Isaac Sim / Isaac Lab / skrl PPO stack that trains a policy to fly the organizer's ten-gate hall course from projected gate corners plus IMU, and to hover in front of a gate. The policy emits four numbers, collective thrust and three body rates, which a Jetson Orin NX on the aircraft streams to a Betaflight flight controller over MSP.
 
-The whole project, across all three repositories, is written up in **[the paper](paper/paper.md)** ([PDF](paper/paper.pdf), NeurIPS style).
+The whole project, across all three repositories, is written up in **[the paper](paper/paper.md)** ([PDF](paper/paper.pdf)), a team write-up in the format of a research paper.
 
 ![The racing policy taking off from the competition pad and through gate 1](paper/figures/race_start_from_pad.gif)
 

@@ -7,11 +7,11 @@
 `paper.md` is the write-up of the whole AI Grand Prix physical-qualifier effort:
 the perception pipeline, the simulator and training stack, the measurements
 taken on the aircraft, and the sequence of failures that ended the attempt.
-It is the one source. `paper.pdf` is the typeset rendering in the official
-NeurIPS style (`neurips/neurips_2025.sty`, `final` option, the newest style
-file published at the time of writing): `md2tex.py` converts the Markdown to
-`neurips/paper.tex` and `pdflatex` sets it. Charts go in as vector PDFs, so
-their text is selectable.
+It is the one source. `paper.pdf` is the typeset rendering: `md2tex.py`
+converts the Markdown to `neurips/paper.tex` and `pdflatex` sets it using the
+NeurIPS style file for its page layout only (`neurips/neurips_2025.sty`; the
+conference footer is replaced with a note that this is a team write-up, not a
+submission). Charts go in as vector PDFs, so their text is selectable.
 
 `videos/` holds the five recordings the paper links to (63 MB, plain files,
 not LFS):

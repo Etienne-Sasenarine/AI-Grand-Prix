@@ -4,7 +4,7 @@
 ¹ College of Engineering, Cornell University · ² College of Arts and Sciences, Cornell University
 Team Electric Fire (Team 10), AI Grand Prix Physical Qualifier, Anduril LC3, Santa Ana, California, 15–22 September 2026
 
-*Draft of 22 September 2026. Author order is provisional pending the team's agreement.*
+*A team write-up in the format of a research paper, because the format keeps methods, numbers and failures on one page. It is not a submission to any venue. Draft of 22 September 2026; author order provisional pending the team's agreement.*
 
 Code: [bojro/aigp-sim](https://github.com/bojro/aigp-sim) (simulation and policy training), [bojro/aigp-perception](https://github.com/bojro/aigp-perception) (gate perception), [Code-Red-Cables/AI_GP](https://github.com/Code-Red-Cables/AI_GP) (flight client and on-site work, private).
 
@@ -22,7 +22,7 @@ Drone racing compresses perception, state estimation and control into a few seco
 
 What follows is one team's record of that week and the four months before it. We have written it as a research report rather than a post-mortem for two reasons. Most of the work is reusable. And most of the measurements are new: until now nobody had written down, for this aircraft, how fast its telemetry link is, what units its gyro speaks, or how badly its rate curve distorts a policy's commands. There is a third reason, too. The attempt fell short of a scored run, and the reasons are specific, ordered and, with hindsight, addressable.
 
-Most of the parts here are not original. The simulator is a fork of an open drone-racing project; the policy is standard PPO; the detector is an off-the-shelf pose model; the controllers on the virtual qualifiers were textbook. What we built on top of those is smaller and more specific: a geometric labeller that gets ring identity from image topology, a hashed observation contract shared between simulator and aircraft, a corner-dropout model calibrated on the real detector, a plant corrected from measurements rather than a datasheet, and a set of bench measurements on this aircraft that nobody had made. This document is written in the shape of a research paper because that shape forces the numbers, the methods and the failures onto the same page. It is a record of what a small team can build in four months and where the engineering held and gave way, not a claim of novelty.
+Most of the parts here are not original. The simulator is a fork of an open drone-racing project; the policy is standard PPO; the detector is an off-the-shelf pose model; the controllers on the virtual qualifiers were textbook. What we built on top of those is smaller and more specific: a geometric labeller that gets ring identity from image topology, a hashed observation contract shared between simulator and aircraft, a corner-dropout model calibrated on the real detector, a plant corrected from measurements rather than a datasheet, and a set of bench measurements on this aircraft that nobody had made. This document is written in the shape of a research paper because that shape forces the numbers, the methods and the failures onto the same page. It is a record of what a small team can build in four months and where the engineering held and gave way; it is not a claim of novelty and not a submission to any venue.
 
 We claim four contributions.
 
