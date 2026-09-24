@@ -10,9 +10,9 @@ import os, sys, glob, subprocess, tempfile
 HERE = os.path.dirname(os.path.abspath(__file__))
 TMP = os.path.join(tempfile.gettempdir(), "aigp_gif_frames")
 CLIPS = [  # name, source video, start s, end s, width px, fps, colours
-    ("race_start_from_pad", "race_start_from_pad.mp4", 0.0, 6.7, 560, 10, 64),
-    ("race_best", "race_best.mp4", 0.0, 9.9, 560, 8, 64),
-    ("stack_pov", "stack_run_02.mp4", 6.0, 16.0, 640, 8, 64),
+    ("race_start_from_pad", "race_start_from_pad.mp4", 0.0, 6.7, 800, 10, 64),
+    ("race_best", "race_best.mp4", 0.0, 9.9, 800, 8, 64),
+    ("stack_pov", "stack_run_02.mp4", 6.0, 16.0, 1000, 8, 64),
 ]
 
 def dump():
