@@ -70,7 +70,7 @@ Every autonomous racer runs the same loop. Find the gates in the image; estimate
 | Jul 2026 | Virtual qualifier 2 removed position telemetry. YOLO corners + IMU dead reckoning (`Q2_pnp`, passed gates 1–2); a 16-state dual-gate EKF (`Q2_kalman`); a DreamerV3 world model (168k steps, zero gates, deleted) | No autonomous lap; human personal best 35.96 s |
 | Aug 2026 | Li & de Croon style classical stack; a snake-gate detector; HG-DAgger imitation of 17–18 human laps with a temporal-convolutional policy | Human best 14.04 s; the imitation policy "leaves the pad and will crash" |
 | 30 Aug–16 Sep | Isaac Lab PPO on a digitised copy of the physical course; keeper checkpoint `pq_speed_best` at 33 gates per 40 s episode | Fast but brittle (Section 5.4); abandoned on the corrected simulator |
-| 17–22 Sep | On site: MSP adapter, bench measurements, hand-labelled gate detector, 40 Hz retrains with dropout, three hover runners, a classical "stack_min" fallback in simulation | No scored autonomous run; fleet lost (Section 7) |
+| 17–22 Sep | On site: MSP adapter, bench measurements, hand-labelled gate detector, 40 Hz retrains with dropout, three hover runners, a classical "stack_min" fallback in simulation | No scored autonomous run; all four aircraft grounded (Section 7) |
 
 *Table 1. The eras of the project. The branch names in the archived repository match the middle column.*
 

@@ -35,6 +35,9 @@ def save(fig, name, vector=True):
     if vector:
         stem = os.path.splitext(p)[0]
         fig.savefig(stem + ".pdf"); fig.savefig(stem + ".svg")
+        # the SVG names matplotlib's bundled font, which browsers do not have; give them a sans-serif stack instead
+        svg = open(stem + ".svg", encoding="utf-8").read().replace("'DejaVu Sans'", "'Helvetica Neue', Helvetica, Arial, sans-serif")
+        open(stem + ".svg", "w", encoding="utf-8").write(svg)
     plt.close(fig); print("wrote", p)
 
 def headline(fig, title, subtitle, y=1.0):
