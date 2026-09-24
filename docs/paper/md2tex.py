@@ -37,7 +37,8 @@ def table(lines):
     rows = [[c.strip() for c in l.strip().strip("|").split("|")] for l in lines if not re.match(r"^\s*\|?\s*-", l)]
     ncol = max(len(r) for r in rows)
     wide = ncol >= 3
-    spec = "@{}" + ("p{0.28\\linewidth}" + "p{%.2f\\linewidth}" % (0.64 / (ncol - 1)) * (ncol - 1) if wide else "p{0.34\\linewidth}p{0.60\\linewidth}") + "@{}"
+    first, rest = (0.28, 0.64) if ncol < 5 else (0.16, 0.70)
+    spec = "@{}" + ("p{%.2f\\linewidth}" % first + "p{%.2f\\linewidth}" % (rest / (ncol - 1)) * (ncol - 1) if wide else "p{0.34\\linewidth}p{0.60\\linewidth}") + "@{}"
     body = [r"\begin{table}[htbp]\centering\small", r"\begin{tabular}{" + spec + "}", r"\toprule"]
     body.append(" & ".join(inline(c) for c in rows[0]) + r" \\ \midrule")
     for r in rows[1:]:
