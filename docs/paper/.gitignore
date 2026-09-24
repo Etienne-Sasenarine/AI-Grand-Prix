@@ -3,3 +3,4 @@ neurips/*.aux
 neurips/*.log
 neurips/*.out
 neurips/*.toc
+neurips/paper.pdf

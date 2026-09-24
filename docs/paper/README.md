@@ -7,12 +7,11 @@
 `paper.md` is the write-up of the whole AI Grand Prix physical-qualifier effort:
 the perception pipeline, the simulator and training stack, the measurements
 taken on the aircraft, and the sequence of failures that ended the attempt.
-It is the one source; two renderings are kept beside it:
-
-* `paper.pdf` — the Markdown rendered as-is (headless Chrome).
-* `neurips/paper.pdf` — the same text typeset in the official NeurIPS style
-  (`neurips/neurips_2025.sty`, `final` option), produced by `md2tex.py` and
-  `pdflatex`. The 2026 style file was not published at the time of writing.
+It is the one source. `paper.pdf` is the typeset rendering in the official
+NeurIPS style (`neurips/neurips_2025.sty`, `final` option, the newest style
+file published at the time of writing): `md2tex.py` converts the Markdown to
+`neurips/paper.tex` and `pdflatex` sets it. Charts go in as vector PDFs, so
+their text is selectable.
 
 `videos/` holds the five recordings the paper links to (63 MB, plain files,
 not LFS):
@@ -27,8 +26,7 @@ not LFS):
 
     python3 make_figures.py     # regenerates the charts from the numbers and logs cited in the paper
     python3 make_figures_extra.py   # the system diagram, timeline, label funnel, stress causes, contract layout
-    python3 build_pdf.py        # paper.md -> paper.html -> paper.pdf (needs the `markdown` package and Google Chrome)
-    python3 md2tex.py && (cd neurips && pdflatex paper.tex && pdflatex paper.tex)   # the NeurIPS-style PDF
+    python3 md2tex.py && (cd neurips && pdflatex paper.tex && pdflatex paper.tex) && cp neurips/paper.pdf paper.pdf
 
 `make_figures.py` reads the team's recorded numbers (session notes, bench
 findings, checkpoint provenance), the 18 Sep telemetry CSV, the TensorBoard
@@ -37,8 +35,7 @@ dependency-free reader), the briefing's vector figures, and the onboard camera
 captures and detector galleries. Those sources live in the flight repo and on
 the team laptop, not here; the generated PNGs are committed so the paper
 renders on GitHub without them. Each chart is also saved as `.svg` and `.pdf`
-with live text; the HTML-to-PDF build uses the SVGs and the LaTeX build the
-PDFs, so chart text is selectable in both renderings. Titles and encodings
+with live text; the LaTeX build uses the PDFs, so chart text is selectable. Titles and encodings
 live in the captions, not inside the images.
 
 ## Figures
