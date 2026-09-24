@@ -1,7 +1,7 @@
 # Vision-Only Autonomous Drone Racing on Borrowed Hardware: Team Electric Fire at the AI Grand Prix Physical Qualifier
 
-**Bojro Das¹, Geneustace Wicaksono², Etienne Sasenarine², John Apessos², Grant Lin², Aaron Legg², Narayan Topalli²**
-¹ College of Arts and Sciences, Cornell University · ² College of Engineering, Cornell University
+**Geneustace Wicaksono¹, Bojro Das², Etienne Sasenarine¹, John Apessos¹, Grant Lin¹, Narayan Topalli¹, Aaron Legg¹**
+¹ College of Engineering, Cornell University · ² College of Arts and Sciences, Cornell University
 Team Electric Fire (Team 10), AI Grand Prix Physical Qualifier, Anduril LC3, Santa Ana, California, 15–22 September 2026
 
 *Draft of 22 September 2026. Author order is provisional pending the team's agreement.*
