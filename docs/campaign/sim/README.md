@@ -2,7 +2,7 @@
 
 **The simulator and policy-training half of Team Electric Fire's entry to the AI Grand Prix physical qualifier** (Anduril LC3, Santa Ana, 15–22 September 2026). An Isaac Sim / Isaac Lab / skrl PPO stack that trains a policy to fly the organizer's ten-gate hall course from projected gate corners plus IMU, and to hover in front of a gate. The policy emits four numbers, collective thrust and three body rates, which a Jetson Orin NX on the aircraft streams to a Betaflight flight controller over MSP.
 
-The whole project, across all three repositories, is written up in **[the paper](paper/paper.md)** ([PDF](paper/paper.pdf), NeurIPS style). Read that first if you want the story; read on if you want to run the code.
+The whole project, across all three repositories, is written up in **[the paper](paper/paper.md)** ([PDF](paper/paper.pdf), NeurIPS style).
 
 ![The 40 Hz racing policy trained under corner dropout flying the full course in Isaac from the competition pad: 36 of 64 aircraft completed the first lap](paper/figures/race40drop_first_lap.png)
 
@@ -12,7 +12,7 @@ The whole project, across all three repositories, is written up in **[the paper]
 
 *The classical fallback stack under a pessimistic sensor model, chase view beside the drone's own camera with the simulated detector's corners drawn. All recordings, including the racing policy's, are in [paper/videos/](paper/videos/).*
 
-## Results at a glance
+## Results
 
 | | | scored under |
 |---|---|---|
@@ -24,7 +24,7 @@ The whole project, across all three repositories, is written up in **[the paper]
 
 Both racing checkpoints are in [`checkpoints/`](checkpoints/). Nothing trained here flew props-on; the paper's Sections 6 and 7 say why, and what the aircraft measured.
 
-## What is original here, and what is not
+## What was built here
 
 The simulator is a fork of [Kousheek Chakraborty's `isaac_drone_racer`](https://github.com/kousheekc/isaac_drone_racer); PPO is skrl's; the tasks follow Isaac Lab's manager pattern. What the team built on top:
 
@@ -32,17 +32,17 @@ The simulator is a fork of [Kousheek Chakraborty's `isaac_drone_racer`](https://
 * **A plant corrected from measurements**: 1745 g mass distributed across links, inertia estimated for the real airframe and its centre-of-mass tilt fixed, rate-loop gains derived rather than inherited, action delay and setpoint lag, a 30 Hz camera latch with a 1–4 step vision delay.
 * **Corner dropout calibrated on the real detector** (13% missing, 0.81 sticky, measured over 1345 frames at a real gate), which is what `race40drop` trained against.
 * **Starts that match the race**: on the floor at the competition pad, after two silent spawn bugs were found and fixed.
-* **A smoke test whose exit code could not fail**, fixed, and a set of bench diagnostics for checkpoints.
+* **A smoke test that gates every training run** on a rented box, and bench diagnostics for checkpoints.
 
-## Start here
+## Documentation
 
 1. [`paper/paper.md`](paper/paper.md): the whole effort in one document, figures and videos included.
 2. [`docs/OBSERVATION.md`](docs/OBSERVATION.md): the 55-channel contract, the timing model, every environment variable.
 3. [`docs/PLANT.md`](docs/PLANT.md): what the simulated aircraft is, number by number, and what is not modelled.
 4. [`docs/TRAINING_RESULTS.md`](docs/TRAINING_RESULTS.md): every result with its checkpoint and commit.
-5. [`docs/RUNBOOK_RUNPOD.md`](docs/RUNBOOK_RUNPOD.md): how to run this on a rented GPU, and everything that went wrong the first time.
+5. [`docs/RUNBOOK_RUNPOD.md`](docs/RUNBOOK_RUNPOD.md): how to run this on a rented GPU, with the failure catalogue from the first attempt.
 
-## Three commands
+## Usage
 
 ```bash
 python -m pytest -q                                   # 256 pass, no Isaac needed
@@ -84,7 +84,7 @@ paper/        the write-up, its figures, videos and build scripts
 
 The package names (`contract`, `tasks`, `utils`, `dynamics`, `assets`) are deliberately unchanged from the vendored `isaac_drone_racer` tree. They are imported by name from the pod scripts, from the flight repo's vendored copy of `contract/`, and from the perception-stack simulator on the `perception-sim` branch of the flight repo; renaming them would break every one of those for a cosmetic gain. Isaac Lab itself does not care: the gym ids are registered from `tasks/__init__.py` by whatever the package is called.
 
-## The contract, in three sentences
+## The observation contract
 
 `utils/aigp_obs.py` here and `race_obs.py` on the aircraft are two implementations of one observation vector, and if they disagree by a channel order or a clip nothing raises: the policy flies confidently on numbers that mean something else. So `contract/` defines the vector, the camera and the plant constants once, with no dependencies, and hashes every value both ends must agree on (v2, the current contract: `a20c14d6a335`, 55 channels × 32 frames = 1760). `train.py` stamps the hash into every run as `contract.json` and `play.py` refuses a checkpoint whose stamp disagrees with the running code.
 
@@ -98,7 +98,7 @@ git clone https://github.com/bojro/aigp-sim && cd aigp-sim
 python -m pytest -q          # 256 passed, without Isaac
 ```
 
-Isaac Sim 4.5, Isaac Lab 2.1.0 and **skrl 1.4.2** (not 2.x; Isaac Lab 2.1 uses the 1.x runner API). The tests need only torch and pytest. Two warnings that each cost a session:
+Isaac Sim 4.5, Isaac Lab 2.1.0 and **skrl 1.4.2** (not 2.x; Isaac Lab 2.1 uses the 1.x runner API). The tests need only torch and pytest. Two requirements:
 
 * **The A100 is the wrong card.** GA100 is the one Ampere die without RT cores and Isaac Sim needs a Vulkan device even headless. L40S, RTX 6000 Ada, A10G or a 4090 all work.
 * **On Linux, export `LD_LIBRARY_PATH`** (WSL: `/usr/lib/wsl/lib`) before training, or PhysX cannot find `libcuda.so`, silently falls back to the CPU solver, and runs ~100× slower while appearing to work.
