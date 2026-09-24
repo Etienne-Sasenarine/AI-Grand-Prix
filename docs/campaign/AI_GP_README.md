@@ -53,4 +53,4 @@ Never validated: props-on policy flight, automatic takeoff or landing, any posit
 
 ## Team
 
-We are Team Electric Fire, Cornell University: Bojro Das (College of Arts and Sciences), Geneustace Wicaksono, Etienne Sasenarine, John Apessos, Grant Lin, Aaron Legg and Narayan Topalli (College of Engineering). The MSP library and camera toolchain under `pq/target/` are the organizers'. The simulator descends from Kousheek Chakraborty's `isaac_drone_racer` (BSD-3-Clause).
+We are Team Electric Fire, Cornell University: Geneustace Wicaksono, Bojro Das (College of Arts and Sciences), Etienne Sasenarine, John Apessos, Grant Lin, Narayan Topalli and Aaron Legg (College of Engineering). The MSP library and camera toolchain under `pq/target/` are the organizers'. The simulator descends from Kousheek Chakraborty's `isaac_drone_racer` (BSD-3-Clause).
