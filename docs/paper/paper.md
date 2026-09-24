@@ -303,7 +303,7 @@ The common thread is that none of these values was *read off the artefact*. They
 
 ### 8.2 Checks that shared a cause with the thing they checked
 
-The team had plenty of tests. What it lacked were tests able to fail.
+The team wrote a great many tests. The ones that mattered most, in hindsight, were the few that could have failed on their own.
 
 | The check | Why it could not fail | What it hid |
 |---|---|---|
