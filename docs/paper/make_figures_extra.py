@@ -17,7 +17,7 @@ from matplotlib.patches import FancyBboxPatch, FancyArrowPatch, Rectangle
 from matplotlib.colors import ListedColormap
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from make_figures import (BLUE, ORANGE, AQUA, YELLOW, MAGENTA, GREEN, VIOLET, RED, INK, INK2, INK3, GRID, PALE,  # noqa: E402
+from make_figures import (BLUE, ORANGE, AQUA, YELLOW, MAGENTA, GREEN, VIOLET, RED, INK, INK2, INK3, GRID, PALE, SURFACE, DARK,  # noqa: E402
                           headline, note, save, OUT)
 
 FLIGHT = os.path.expanduser("~/dev/ai-grand-prix")
@@ -33,13 +33,13 @@ def arrow(ax, p, q, label="", color=INK2, above=True, rad=0.0, lw=1.2, fs=6.6):
     if label:
         mx, my = (p[0] + q[0]) / 2, (p[1] + q[1]) / 2
         ax.text(mx, my + (0.14 if above else -0.14), label, ha="center", va="bottom" if above else "top", fontsize=fs, color=color, zorder=6,
-                bbox=dict(boxstyle="round,pad=0.15", fc="white", ec="none", alpha=0.9))
+                bbox=dict(boxstyle="round,pad=0.15", fc=SURFACE, ec="none", alpha=0.9))
 
 fig, ax = plt.subplots(figsize=(9.2, 5.2)); fig.subplots_adjust(0, 0, 1, 1); ax.set_xlim(0, 10); ax.set_ylim(0, 6.1); ax.axis("off")
-J, F, R = "#e4eefb", "#fbe6dc", "#e8f6ef"
+J, F, R = ("#1d3350", "#4a2a1c", "#173626") if DARK else ("#e4eefb", "#fbe6dc", "#e8f6ef")
 ax.add_patch(Rectangle((0.15, 2.9), 6.75, 3.05, fc=PALE, ec="none", zorder=1)); ax.text(0.25, 5.88, "on the Jetson Orin NX: Python, NumPy, OpenCV, no deep-learning framework", fontsize=6.8, color=INK2, va="top")
-ax.add_patch(Rectangle((7.0, 2.9), 2.85, 3.05, fc="#faece6", ec="none", zorder=1)); ax.text(7.1, 5.85, "on the flight controller: Betaflight 4.4.3", fontsize=6.8, color=INK2, va="top")
-ax.add_patch(Rectangle((0.15, 0.2), 9.7, 2.45, fc="#eef7f2", ec="none", zorder=1)); ax.text(0.25, 2.55, "the radio pilot, who holds the only abort", fontsize=6.8, color=INK2, va="top")
+ax.add_patch(Rectangle((7.0, 2.9), 2.85, 3.05, fc=("#2a1d17" if DARK else "#faece6"), ec="none", zorder=1)); ax.text(7.1, 5.85, "on the flight controller: Betaflight 4.4.3", fontsize=6.8, color=INK2, va="top")
+ax.add_patch(Rectangle((0.15, 0.2), 9.7, 2.45, fc=("#132019" if DARK else "#eef7f2"), ec="none", zorder=1)); ax.text(0.25, 2.55, "the radio pilot, who holds the only abort", fontsize=6.8, color=INK2, va="top")
 bh, y0 = 1.55, 3.85
 def B(x, w, *a, **k): box(ax, x, y0, w, bh, *a, **k); return x + w
 e = B(0.30, 1.55, "camera", "IMX477, 20 deg up-tilt\n1920x1080 at 30 fps\nHFOV 74 deg, fx 425 px", J)
@@ -59,7 +59,7 @@ ax.text(9.75, y0 - 0.62, "adapter on the command path: inverts the rate and thro
 box(ax, 0.35, 0.5, 2.0, 1.45, "transmitter", "AUX1 = ARM (radio only)\nAUX5 down = policy flies\nAUX2 = ANGLE", R)
 arrow(ax, (2.35, 1.5), (7.75, 2.9), "arming, and the override switch: the abort path", color=GREEN, rad=-0.12, fs=6.2)
 box(ax, 3.6, 0.5, 2.7, 1.45, "props-off handover check", "streams neutral sticks first (the buffer\nstarts at zero, which reads as failsafe),\nthen proves AUX5 off returns control", R)
-box(ax, 7.0, 0.5, 2.7, 1.45, "the missing sensor", "no usable height: the barometer collapses\nunder prop wash, so height comes\nfrom the gate in view", "#fdecec", tc=RED)
+box(ax, 7.0, 0.5, 2.7, 1.45, "the missing sensor", "no usable height: the barometer collapses\nunder prop wash, so height comes\nfrom the gate in view", ("#3a1f1f" if DARK else "#fdecec"), tc=RED)
 headline(fig, "The chain from photons to motors, with what was measured on each link",
          "blue = telemetry back to the observation; orange = the command path where the sign, scale and curve faults of Section 6 lived")
 save(fig, "system_diagram.png")
@@ -123,7 +123,7 @@ for i, (lab, parts) in enumerate(stages):
     y = 2 - i; x = 0
     for n, c, t in parts:
         a1.barh(y, n, left=x, color=c, height=0.55, linewidth=0)
-        if n > 400: a1.text(x + n / 2, y, f"{t}\n{n}" if t else f"{n}", ha="center", va="center", fontsize=6.2, color="white" if c not in (YELLOW, "#8fb8ea") else INK)
+        if n > 400: a1.text(x + n / 2, y, f"{t}\n{n}" if t else f"{n}", ha="center", va="center", fontsize=6.2, color="white" if c not in (YELLOW, "#8fb8ea", "#3a5f8f") else INK)
         x += n
     a1.text(x + 40, y, f"{x}" + ("\nrejected 265,\nquarantined 21" if i == 1 else ""), va="center", fontsize=6.6, color=INK2)
 a1.set_yticks([2, 1, 0]); a1.set_yticklabels([s for s, _ in stages], fontsize=7.2); a1.set_xlabel("gate instances, 1207 frames"); a1.grid(axis="y", visible=False); a1.set_xlim(0, 2800)
@@ -137,7 +137,7 @@ for name, c, z, a in [("rejected", INK3, 2, 0.35), ("review", YELLOW, 3, 0.5), (
 a2.set_xscale("log"); a2.set_xlim(30, 2000); a2.set_ylim(0, 9)
 a2.axhline(4.0, color=INK2, lw=0.9, ls="--"); a2.text(1950, 3.9, "accept cap 4.0 px", fontsize=6.8, color=INK2, va="top", ha="right")
 a2.axhline(4.36, color=RED, lw=0.9, ls=":"); a2.text(32, 4.46, "4.36 px: median error against human labels", fontsize=6.8, color=RED, va="bottom", ha="left")
-m = (verd == "auto") & np.isfinite(al); a2.axhline(np.nanmedian(al[m]), color=BLUE, lw=0.9, ls=":"); a2.text(32, np.nanmedian(al[m]) + 0.1, f"accepted labels' own median {np.nanmedian(al[m]):.2f} px (self-scored)", fontsize=6.8, color=BLUE, va="bottom", bbox=dict(boxstyle="round,pad=0.15", fc="white", ec="none", alpha=0.85))
+m = (verd == "auto") & np.isfinite(al); a2.axhline(np.nanmedian(al[m]), color=BLUE, lw=0.9, ls=":"); a2.text(32, np.nanmedian(al[m]) + 0.1, f"accepted labels' own median {np.nanmedian(al[m]):.2f} px (self-scored)", fontsize=6.8, color=BLUE, va="bottom", bbox=dict(boxstyle="round,pad=0.15", fc=SURFACE, ec="none", alpha=0.85))
 a2.set_xlabel("gate size in the image (outer side, px, log)"); a2.set_ylabel("edge alignment residual (px)"); a2.legend(fontsize=6.8, loc="upper left", markerscale=2)
 a2.set_title("Self-scored accuracy against gate size", loc="left", fontsize=8.5)
 headline(fig, "The geometric auto-labeller: yield, and the number that turned out to be optimistic",
@@ -167,6 +167,37 @@ headline(fig, "How episodes ended for pq_speed_best in each stress scenario, 16 
          "512 simulated aircraft per scenario, one perturbation at a time; the gate-count bug fixed for every run. R = reference, A = expected at the event, B = rougher, C = stress only")
 save(fig, "stress_causes.png")
 
+# ------------------------------------------------------------------ D2. Course map
+import math
+GATES = {  # official number: (x, y, z of the opening centre, flight-direction yaw), from tasks/drone_racer/drone_racer_env_cfg.py
+    1: (3.66, 28.65, 1.35, 1.5708), 2: (4.88, 38.40, 1.35, 1.5708), 3: (12.19, 45.11, 1.35, 0.0), 4: (21.95, 38.10, 1.35, -1.5708),
+    5: (20.12, 28.96, 1.35, -2.1817), 6: (12.50, 24.08, 1.35, 0.0), 7: (21.49, 17.80, 1.35, -1.5708), 8: (18.29, 10.97, 1.35, -2.1817),
+    "9 top": (12.10, 5.27, 4.05, -1.5708), "9 bottom": (12.10, 5.27, 1.35, 1.5708), 10: (3.96, 16.76, 1.35, 1.5708)}
+ORDER = [1, 2, 3, 4, 5, 6, 7, 8, "9 top", "9 bottom", 10]
+PAD = (4.3, 20.9)
+fig, ax = plt.subplots(figsize=(5.2, 8.2))
+ax.add_patch(Rectangle((0, 0), 25.91, 50.29, fc="none", ec=INK3, lw=0.8, ls="--"))
+pts = [PAD] + [GATES[g][:2] for g in ORDER] + [GATES[1][:2]]
+for (x0, y0), (x1, y1) in zip(pts[:-1], pts[1:]):
+    ax.annotate("", xy=(x1, y1), xytext=(x0, y0), arrowprops=dict(arrowstyle="-", color=BLUE, lw=1.0, ls=(0, (3, 3)), alpha=0.7))
+    d = math.hypot(x1 - x0, y1 - y0)
+    if d > 3.5: ax.text((x0 + x1) / 2, (y0 + y1) / 2, f"{d:.1f} m", fontsize=6.2, color=BLUE, ha="center", va="center", bbox=dict(boxstyle="round,pad=0.12", fc=SURFACE, ec="none"))
+for g in ORDER:
+    x, y, z, yaw = GATES[g]
+    dx, dy = math.cos(yaw), math.sin(yaw)
+    ax.plot([x - 1.35 * -dy, x + 1.35 * -dy], [y - 1.35 * dx, y + 1.35 * dx], color=INK, lw=4, solid_capstyle="butt")
+    ax.annotate("", xy=(x + 2.6 * dx, y + 2.6 * dy), xytext=(x + 0.4 * dx, y + 0.4 * dy), arrowprops=dict(arrowstyle="-|>", color=ORANGE, lw=1.4, mutation_scale=10))
+    lab = f"G{g}" if isinstance(g, int) else ("G9 upper, 4.05 m" if "top" in g else "G9 lower")
+    off = (-2.2, 0) if x < 13 else (2.2, 0)
+    if g == "9 bottom": off = (2.2, -1.6)
+    ax.text(x + off[0], y + off[1], lab, fontsize=7, color=INK, ha="right" if off[0] < 0 else "left", va="center", fontweight="semibold")
+ax.plot(*PAD, "s", color=GREEN, ms=8); ax.text(PAD[0] - 0.9, PAD[1], "start pad", fontsize=7, color=GREEN, ha="right", va="center")
+ax.text(12.9, 0.9, "85 x 165 ft boundary", fontsize=6.5, color=INK3, ha="center")
+ax.set_aspect("equal"); ax.set_xlim(-4.5, 30); ax.set_ylim(-1.5, 52); ax.set_xlabel("x, east (m)"); ax.set_ylabel("y, north (m)")
+ax.set_title("The course: ten gates, eleven crossings per lap, flown in numbered order", loc="left", fontsize=8.5)
+ax.text(-4.0, 51.2, "bar = the 2.7 m gate frame   orange arrow = required direction   dashed = the route, with leg lengths", fontsize=6.3, color=INK2, va="top")
+save(fig, "course_map.png")
+
 # ------------------------------------------------------------------ E. Observation contract
 groups = [("corner u,v x8", 16, BLUE, "detector, through a 30 Hz latch,\na 1-4 step delay and sticky dropout"),
           ("visible x8", 8, "#8fb8ea", "-1 sentinel when unseen"),
@@ -183,8 +214,8 @@ for gi, (_, w, _, _) in enumerate(groups):
 fig, ax = plt.subplots(figsize=(7.4, 5.6))
 cmap = ListedColormap([g[2] for g in groups])
 ax.imshow(img, cmap=cmap, aspect="auto", interpolation="nearest", alpha=0.9, extent=(0, n, H, 0))
-for k in range(1, H): ax.axhline(k, color="white", lw=0.4)
-for c, w in bounds: ax.axvline(c, color="white", lw=1.2)
+for k in range(1, H): ax.axhline(k, color=SURFACE, lw=0.4)
+for c, w in bounds: ax.axvline(c, color=SURFACE, lw=1.2)
 ax.add_patch(Rectangle((0, H - 1), n, 1, fc="none", ec=INK, lw=1.6, zorder=5)); ax.text(n + 0.4, H - 0.5, "newest frame: the one the runner\nbuilds this step", fontsize=6.8, color=INK, va="center")
 ax.text(n + 0.4, 0.5, "oldest of 32 frames\n= 0.8 s of history at 40 Hz", fontsize=6.8, color=INK2, va="center")
 ax.set_xlim(0, n + 14); ax.set_ylim(H, -0.5); ax.set_yticks([]); ax.set_xticks([])

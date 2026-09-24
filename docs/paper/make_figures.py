@@ -16,23 +16,31 @@ from matplotlib.patches import FancyArrowPatch
 from PIL import Image
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-OUT = os.path.join(HERE, "figures"); os.makedirs(OUT, exist_ok=True)
+# AIGP_FIG_THEME=dark writes PNG-only variants for GitHub's dark theme into figures/dark/;
+# the README serves them through <picture> with prefers-color-scheme.
+DARK = os.environ.get("AIGP_FIG_THEME", "light") == "dark"
+OUT = os.path.join(HERE, "figures", "dark" if DARK else ""); os.makedirs(OUT, exist_ok=True)
 sys.path.insert(0, HERE)
 import tfevents
 
 BLUE, ORANGE, AQUA, YELLOW, MAGENTA, GREEN, VIOLET, RED = "#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#4a3aa7", "#e34948"
-INK, INK2, INK3, GRID, PALE = "#0b0b0b", "#52514e", "#8a8985", "#e6e5e1", "#f3f2ee"
+if DARK:
+    BLUE, ORANGE, AQUA, YELLOW, MAGENTA, GREEN, VIOLET, RED = "#3987e5", "#e8683a", "#22b884", "#e0a020", "#d55181", "#39a839", "#9085e9", "#e66767"
+    INK, INK2, INK3, GRID, PALE, SURFACE = "#f0f0ee", "#c3c2b7", "#8a8985", "#30363d", "#161b22", "#0d1117"
+else:
+    INK, INK2, INK3, GRID, PALE, SURFACE = "#0b0b0b", "#52514e", "#8a8985", "#e6e5e1", "#f3f2ee", "white"
+LIGHTBLUE, LIGHTORANGE, LIGHTBLUE2 = ("#2b4a73", "#6b3a2a", "#3a5f8f") if DARK else ("#a9c8ee", "#f6c3ad", "#8fb8ea")
 rcParams.update({"font.family": "DejaVu Sans", "font.size": 9, "axes.edgecolor": INK2, "axes.labelcolor": INK, "xtick.color": INK2, "ytick.color": INK2,
                  "axes.spines.top": False, "axes.spines.right": False, "axes.grid": True, "grid.color": GRID, "grid.linewidth": 0.6, "axes.axisbelow": True,
-                 "figure.facecolor": "white", "axes.facecolor": "white", "legend.frameon": False, "figure.dpi": 200, "savefig.dpi": 200, "savefig.bbox": "tight",
-                 "axes.titlesize": 9, "axes.titleweight": "normal", "svg.fonttype": "none", "pdf.fonttype": 42})
+                 "figure.facecolor": SURFACE, "axes.facecolor": SURFACE, "legend.frameon": False, "figure.dpi": 200, "savefig.dpi": 200, "savefig.bbox": "tight",
+                 "axes.titlesize": 9, "axes.titleweight": "normal", "svg.fonttype": "none", "pdf.fonttype": 42, "text.color": INK, "legend.labelcolor": INK})
 
 HEADLINES = False   # titles and subtitles live in the paper's captions, where the text is selectable
 
 def save(fig, name, vector=True):
     """PNG for GitHub, plus PDF and SVG with live text for the two typeset renderings (charts only; photo composites stay raster)."""
     p = os.path.join(OUT, name); fig.savefig(p)
-    if vector:
+    if vector and not DARK:
         stem = os.path.splitext(p)[0]
         fig.savefig(stem + ".pdf"); fig.savefig(stem + ".svg")
         # the SVG names matplotlib's bundled font, which browsers do not have; give them a sans-serif stack instead
@@ -58,7 +66,7 @@ def refline(ax, y, label, color=INK2, ls=":", x=0.01, va="bottom", **kw):
 def note(ax, text, xy, xytext, color=INK, fontsize=7.6, ha="left", arrow=True):
     ax.annotate(text, xy=xy, xytext=xytext, fontsize=fontsize, color=color, ha=ha, va="center", zorder=6,
                 arrowprops=dict(arrowstyle="-|>", color=color, lw=0.8, shrinkA=0, shrinkB=3, connectionstyle="arc3,rad=0.15") if arrow else None,
-                bbox=dict(boxstyle="round,pad=0.25", fc="white", ec="none", alpha=0.9))
+                bbox=dict(boxstyle="round,pad=0.25", fc=SURFACE, ec="none", alpha=0.9))
 
 def dumbbell(ax, labels, a, b, ca, cb, la, lb, unit="%", fmt="{:.0f}"):
     y = np.arange(len(labels))[::-1]
@@ -98,7 +106,7 @@ a1.text(41, 69, "34 points", color=INK2, fontsize=7.5, va="center")
 a1.set_xticks(rates); a1.set_xticklabels(["run at 40 Hz\n(the link)", "run at 60 Hz\n(training)"], fontsize=7.8); a1.set_xlim(33, 82); a1.set_ylim(40, 100)
 a1.set_ylabel("hover episodes settled (%)"); a1.grid(axis="x", visible=False)
 vals2 = [8.246, 3.086]
-a2.bar([0, 1], vals2, 0.55, color=[BLUE, "#a9c8ee"], linewidth=0)
+a2.bar([0, 1], vals2, 0.55, color=[BLUE, LIGHTBLUE], linewidth=0)
 for i, v in enumerate(vals2): a2.text(i, v + 0.15, f"{v:.2f}", ha="center", fontsize=8, color=INK2)
 a2.set_xticks([0, 1]); a2.set_xticklabels(["at 60 Hz", "at 40 Hz"]); a2.set_ylabel("gates passed in 15 s"); a2.grid(axis="x", visible=False); a2.set_ylim(0, 9.5)
 a2.text(0.5, 9.0, "racing policy trained at 60 Hz\nkeeps 37% of its gates", ha="center", fontsize=7.8, color=INK2)
@@ -112,7 +120,7 @@ streams = ["no RC stream\n(read-only)", "RC stream at 40 Hz", "RC stream at 60 H
 bm = [10.03, 16.75, 25.10]; bp = [10.27, 20.28, 30.30]; fb = [40.09, 66.90, 100.43]; budget = [None, 25.0, 16.67]
 x = np.arange(3); w = 0.25
 ax.bar(x - w, bm, w, color=BLUE, label="one batched request (MSP_MULTIPLE_MSP), mean", linewidth=0)
-ax.bar(x, bp, w, color="#a9c8ee", label="batched, 95th percentile", linewidth=0)
+ax.bar(x, bp, w, color=LIGHTBLUE, label="batched, 95th percentile", linewidth=0)
 ax.bar(x + w, fb, w, color=ORANGE, label="four separate requests, mean", linewidth=0)
 for xi, v in zip(x - w, bm): ax.text(xi, v + 1, f"{v:.1f}", ha="center", fontsize=7, color=INK2)
 for xi, v in zip(x, bp): ax.text(xi, v + 1, f"{v:.1f}", ha="center", fontsize=7, color=INK2)
@@ -137,16 +145,16 @@ delivered = 200 * rc_rate * stick / (1 - super_rate * stick)
 asked = stick * 3.2 * 180 / np.pi
 cross = asked[np.argmin(np.abs(delivered - asked)[10:]) + 10]
 fig, (a1, a2) = plt.subplots(1, 2, figsize=(7.2, 3.2), gridspec_kw={"wspace": 0.38})
-a1.fill_between(asked, delivered, asked, where=delivered < asked, color="#a9c8ee", alpha=0.6, lw=0, label="under-responds")
-a1.fill_between(asked, delivered, asked, where=delivered >= asked, color="#f6c3ad", alpha=0.7, lw=0, label="over-responds")
+a1.fill_between(asked, delivered, asked, where=delivered < asked, color=LIGHTBLUE, alpha=0.6, lw=0, label="under-responds")
+a1.fill_between(asked, delivered, asked, where=delivered >= asked, color=LIGHTORANGE, alpha=0.7, lw=0, label="over-responds")
 a1.plot(asked, asked, color=INK2, lw=1.2, ls="--"); a1.plot(asked, delivered, color=ORANGE, lw=2.2)
 a1.text(120, 112, "what the policy assumes", color=INK2, fontsize=7.5, rotation=32, ha="left", va="bottom")
 a1.text(92, 330, "what Betaflight sets\n(rc_rate 55, super 75, expo 0)", color=ORANGE, fontsize=7.3, ha="left")
 a1.set_xlabel("body rate the policy asked for (deg/s)"); a1.set_ylabel("rate setpoint the PID loop receives (deg/s)"); a1.set_xlim(0, 184); a1.set_ylim(0, 450)
 a1.legend(loc="upper left", fontsize=7.3)
 ratio = delivered[1:] / asked[1:]
-a2.fill_between(asked[1:], ratio, 1, where=ratio < 1, color="#a9c8ee", alpha=0.6, lw=0)
-a2.fill_between(asked[1:], ratio, 1, where=ratio >= 1, color="#f6c3ad", alpha=0.7, lw=0)
+a2.fill_between(asked[1:], ratio, 1, where=ratio < 1, color=LIGHTBLUE, alpha=0.6, lw=0)
+a2.fill_between(asked[1:], ratio, 1, where=ratio >= 1, color=LIGHTORANGE, alpha=0.7, lw=0)
 a2.plot(asked[1:], ratio, color=ORANGE, lw=2.2); a2.axhline(1, color=INK2, lw=0.9, ls="--")
 for r, e in [(0.2, 0.62), (1.0, 0.78), (2.4, 1.37), (3.2, 2.40)]:
     a2.plot([r * 180 / np.pi], [e], "o", color=ORANGE, ms=4.5, mec="white"); a2.text(r * 180 / np.pi + 6, e + 0.09, f"{e:.2f}x", fontsize=7.3, ha="center", color=INK2)
@@ -163,7 +171,7 @@ t = np.array([float(r["t_s"]) for r in rows]); alt = np.array([float(r["altitude
 spinning = thr > 1010
 fig, (a1, a2) = plt.subplots(2, 1, figsize=(7.2, 3.9), sharex=True, gridspec_kw={"hspace": 0.1})
 for ax in (a1, a2):
-    ax.fill_between(t, 0, 1, where=spinning, transform=ax.get_xaxis_transform(), color="#f6c3ad", alpha=0.45, lw=0)
+    ax.fill_between(t, 0, 1, where=spinning, transform=ax.get_xaxis_transform(), color=LIGHTORANGE, alpha=0.45, lw=0)
 a1.plot(t, thr, color=BLUE, lw=1.3); a1.set_ylabel("throttle stick (us)"); a1.set_ylim(980, 1300)
 a1.text(t[spinning][0], 1280, "shaded = propellers turning", fontsize=7.5, color=ORANGE, ha="left", va="top")
 a2.plot(t, alt, color=ORANGE, lw=1.3); a2.set_ylabel("barometer altitude (m)"); a2.set_xlabel("time (s)")
@@ -253,6 +261,7 @@ def panel(imgs, titles, name, ncol, figw=7.2):
     fig.tight_layout(pad=0.4); save(fig, name, vector=False)
 
 try:
+    if DARK: raise FileNotFoundError("composites are theme-neutral; light run only")
     panel([load("~/Downloads/gate frames/0919_220524_000107.jpg", 960), load("~/dev/aigp-runs/drone_frames/0920_224905_f00150.jpg", 960),
            load("~/dev/ai-grand-prix/datasets/autolabel/overlays/0919_214639_000000.jpg", 960), load("~/dev/ai-grand-prix/datasets/hybrid/preview/img/0919_214639_000004.jpg", 960)],
           ["(a) onboard camera, hand-carried walk-around, 19 Sep", "(b) onboard camera at a close gate, 20 Sep: corners leave the frame",
@@ -268,7 +277,7 @@ except FileNotFoundError as e:
     print("keeping committed composites:", e)
 
 # The 17 Sep briefing's vector figures, rasterised from the flight repo when it is present.
-briefing = os.path.expanduser("~/dev/ai-grand-prix/pq/briefing/figs")
+briefing = os.path.expanduser("~/dev/ai-grand-prix/pq/briefing/figs") if not DARK else "/nonexistent"
 for n in ["course_overlay", "camera_fov", "stress_results", "retrain_curves", "bug_ab", "planb_tradeoff"]:
     src = os.path.join(briefing, n + ".pdf")
     if not os.path.exists(src):
@@ -281,6 +290,7 @@ for n in ["course_overlay", "camera_fov", "stress_results", "retrain_curves", "b
 
 # 10. Video poster frames (extracted with OpenCV in a venv; see README) ----------------
 try:
+    if DARK: raise FileNotFoundError("light run only")
     posters = [("poster_race_start_from_pad.jpg", "(a) race_start_from_pad.mp4: the 40 Hz racing policy lifts off the competition pad and takes gate 1"),
                ("poster_race_best.jpg", "(b) race_best.mp4: the best racing checkpoint, chase camera"),
                ("poster_stack_run_02.jpg", "(c) stack_run_02.mp4: the classical stack, chase view (left) and its own camera with detections (right)")]

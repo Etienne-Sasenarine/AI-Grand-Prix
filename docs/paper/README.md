@@ -25,7 +25,8 @@ not LFS):
 ## Rebuilding it
 
     python3 make_figures.py     # regenerates the charts from the numbers and logs cited in the paper
-    python3 make_figures_extra.py   # the system diagram, timeline, label funnel, stress causes, contract layout
+    python3 make_figures_extra.py   # the system diagram, timeline, course map, label funnel, stress causes, contract layout
+    AIGP_FIG_THEME=dark python3 make_figures.py && AIGP_FIG_THEME=dark python3 make_figures_extra.py   # dark variants for the README
     ~/dev/ai-grand-prix/.venv_mac/bin/python make_gifs.py dump && python3 make_gifs.py assemble   # the animated clips
     python3 md2tex.py && (cd neurips && pdflatex paper.tex && pdflatex paper.tex) && cp neurips/paper.pdf paper.pdf
 
@@ -54,6 +55,8 @@ live in the captions, not inside the images.
 | `stack_sim_paths.png` | the classical fallback stack flown in Isaac, 21 Sep |
 | `race_contact_sheet.jpg` | the racing policy's onboard camera in Isaac, 20 Sep |
 | `video_posters.png`, `poster_*.jpg` | one frame from each recording in `videos/` (extracted with OpenCV) |
+| `course_map.png` | the course from the simulator's gate table: frames, directions, route, leg lengths |
+| `figures/dark/*.png` | dark-theme variants of the charts, served by the repo README through `<picture>` (`AIGP_FIG_THEME=dark`) |
 | `system_diagram.png`, `project_timeline.png`, `observation_contract.png` | drawn from the documents: the chain from camera to motors with measured rates, the four-month timeline with the on-site week, the 55 x 32 observation layout (`make_figures_extra.py`) |
 | `autolabel_funnel.png` | `datasets/autolabel/report.csv` and `datasets/hybrid/report.csv` in the flight repo (2467 candidates, 1917 hybrid labels) |
 | `stress_causes.png` | the 28 stress-scenario JSONs under `analysis/2026-09-16/experiments/results/stress/` |

@@ -4,13 +4,13 @@
 
 The whole project, across all three repositories, is written up in **[the paper](paper/paper.md)** ([PDF](paper/paper.pdf), NeurIPS style).
 
+![The best racing checkpoint flying the course in Isaac, chase camera](paper/figures/race_best.gif)
+
+*The best racing checkpoint on the corrected course, chase camera, in Isaac Sim ([race_best.mp4](paper/videos/race_best.mp4)).*
+
 ![The 40 Hz racing policy trained under corner dropout flying the full course in Isaac from the competition pad: 36 of 64 aircraft completed the first lap](paper/figures/race40drop_first_lap.png)
 
-*The 40 Hz racing policy trained under measured corner dropout (`race40drop`) flying the course in Isaac from the competition pad. 36 of 64 aircraft completed the first lap. Every path in blue, one aircraft coloured by height; right, height over the lap and when each gate was passed.*
-
-![Ten seconds of the classical fallback stack in Isaac: chase view on the left, the drone's own camera with detections on the right](paper/figures/stack_pov.gif)
-
-*The classical fallback stack under a pessimistic sensor model, chase view beside the drone's own camera with the simulated detector's corners drawn. All recordings, including the racing policy's, are in [paper/videos/](paper/videos/).*
+*The 40 Hz racing policy trained under measured corner dropout (`race40drop`) flying the course from the competition pad. 36 of 64 aircraft completed the first lap. Every path in blue, one aircraft coloured by height; right, height over the lap and when each gate was passed.*
 
 ## Results
 
@@ -24,7 +24,18 @@ The whole project, across all three repositories, is written up in **[the paper]
 
 Both racing checkpoints are in [`checkpoints/`](checkpoints/). Nothing trained here flew props-on; the paper's Sections 6 and 7 say why, and what the aircraft measured.
 
+![The racing policy taking off from the competition pad and through gate 1](paper/figures/race_start_from_pad.gif)
+
+*The pad start: on the floor 7.4 m before gate 1, up and through it ([race_start_from_pad.mp4](paper/videos/race_start_from_pad.mp4)). Before the spawn fixes this succeeded in 0 of 456 attempts.*
+
 ## What was built here
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="paper/figures/dark/system_diagram.png">
+  <img alt="The chain from camera to motors with the measured rate on each link" src="paper/figures/system_diagram.png">
+</picture>
+
+*The chain from camera to motors as it stood on 21 September, with the measured rate or latency on each link. Blue is telemetry back to the observation, orange the command path. The lower band is what the pilot owns.*
 
 The simulator is a fork of [Kousheek Chakraborty's `isaac_drone_racer`](https://github.com/kousheekc/isaac_drone_racer); PPO is skrl's; the tasks follow Isaac Lab's manager pattern. What the team built on top:
 
@@ -59,6 +70,13 @@ The drone is **not** a 5-inch racing quad. It is the organizer-supplied Neros Ar
 
 The course is ten gates from the organizer's coordinate table; gate 9 is a stacked double gate flown through twice per lap, so a lap is **11 crossings** and a scored two-lap run is 22. The simulator's 11 track entries are those crossings.
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="paper/figures/dark/course_map.png">
+  <img alt="The course: ten gates, eleven crossings per lap, with leg lengths" src="paper/figures/course_map.png">
+</picture>
+
+*The course as the simulator has it, from the organizer's coordinate table: gate frames, required direction, the route with leg lengths, and the start pad.*
+
 ## Layout
 
 ```
@@ -86,6 +104,13 @@ The package names (`contract`, `tasks`, `utils`, `dynamics`, `assets`) are delib
 
 ## The observation contract
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="paper/figures/dark/observation_contract.png">
+  <img alt="The 55-channel by 32-frame observation, coloured by source" src="paper/figures/observation_contract.png">
+</picture>
+
+*The observation as the policy receives it: one row per frame, 32 deep, one column per channel, coloured by where the channel comes from.*
+
 `utils/aigp_obs.py` here and `race_obs.py` on the aircraft are two implementations of one observation vector, and if they disagree by a channel order or a clip nothing raises: the policy flies confidently on numbers that mean something else. So `contract/` defines the vector, the camera and the plant constants once, with no dependencies, and hashes every value both ends must agree on (v2, the current contract: `a20c14d6a335`, 55 channels × 32 frames = 1760). `train.py` stamps the hash into every run as `contract.json` and `play.py` refuses a checkpoint whose stamp disagrees with the running code.
 
 ## Install
@@ -110,8 +135,29 @@ Isaac Sim 4.5, Isaac Lab 2.1.0 and **skrl 1.4.2** (not 2.x; Isaac Lab 2.1 uses t
 * **Mass is measured; inertia is estimated** and not randomised.
 * **No motor model.** Thrust and moments apply directly; the rate loop is slower than a real Betaflight loop, in the conservative direction.
 * **The policy rate matters.** The Jetson closes the loop at 40 Hz; a 60 Hz policy loses a third of its settled time there. Both tasks accept `AIGP_POLICY_HZ` / `AIGP_HOVER_HZ` to train at the rate they will fly.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="paper/figures/dark/rate_40_vs_60.png">
+  <img alt="Hover settled fraction and racing gates at 40 and 60 Hz" src="paper/figures/rate_40_vs_60.png">
+</picture>
+
+*Left: hover settled fraction for the 60 Hz checkpoint and the 40 Hz retrain, each run at both rates. Right: the 60 Hz racing checkpoint at both rates.*
 * **Three asset files are broken LFS pointers** whose content is gone from the upstream remote. Nothing loads them ([`assets/BROKEN_LFS_OBJECTS.md`](assets/BROKEN_LFS_OBJECTS.md)).
 * **Nothing here exports to the Jetson.** The NumPy export of a checkpoint and the runner that flies it live in the flight repo under `pq/flight/onboard/`.
+
+## Recordings
+
+![Ten seconds of the classical fallback stack in Isaac: chase view on the left, the drone's own camera with detections on the right](paper/figures/stack_pov.gif)
+
+*The classical fallback stack under a pessimistic sensor model: chase view beside the drone's own camera with the simulated detector's corners drawn.*
+
+| file | what it shows |
+|---|---|
+| [`race_best.mp4`](paper/videos/race_best.mp4) | the best racing checkpoint, chase camera, 9.9 s |
+| [`race_start_from_pad.mp4`](paper/videos/race_start_from_pad.mp4) | the 40 Hz policy taking off from the competition pad and through gate 1, 6.7 s |
+| [`stack_run_01.mp4`](paper/videos/stack_run_01.mp4), [`02`](paper/videos/stack_run_02.mp4), [`03`](paper/videos/stack_run_03.mp4) | the classical fallback stack, chase view beside its own camera with detections, 60 s each |
+
+A side-by-side recording of the policy with its own camera view is not made yet; `scripts/diag/record_race_pov.py` produces it on any machine with Isaac Sim (`docs/HANDOFF_WINDOWS_RECORDING.md`).
 
 ## The other two repositories
 
