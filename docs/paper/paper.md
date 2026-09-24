@@ -78,7 +78,7 @@ Every autonomous racer runs the same loop. Find the gates in the image; estimate
 
 *Figure 2. Four months and one week. Top: the eras of Table 1 with the milestone each one reached. Bottom: the physical-qualifier week day by day, progress above the line and setbacks below, from the commit history and the session notes.*
 
-Here is the physical-qualifier system end to end. The camera delivers frames at 30 fps. A YOLOv8n-pose detector places the eight corners of every visible gate. Those corners, together with roll, pitch and body rates from the flight controller and a dead-reckoned body velocity, are packed into a fixed-width observation history. A NumPy multilayer perceptron, exported from the trained checkpoint, maps that history to a collective-thrust value and three body rates. An adapter converts the four numbers into RC channel values by inverting Betaflight's rate and throttle curves, and streams them at 40 Hz. Because nothing on the real course announces which gate comes next, a gate tracker keeps count. Alongside all this ran a classical stack, `stack_min`, as the slow fallback: the same detector, a perspective-n-point pose, an alpha-beta position filter and a stop-and-go guidance cascade in ANGLE mode.
+Here is the physical-qualifier system end to end. The camera delivers frames at 30 fps. A YOLOv8n-pose detector places the eight corners of every visible gate. Those corners, together with roll, pitch and body rates from the flight controller and a dead-reckoned body velocity, are packed into a fixed-width observation history. A NumPy multilayer perceptron, exported from the trained checkpoint, maps that history to a collective-thrust value and three body rates. An adapter converts the four numbers into RC channel values, inverting Betaflight's rate curve for the three rates and mapping throttle directly, and streams them at 40 Hz. Because nothing on the real course announces which gate comes next, a gate tracker keeps count. Alongside all this ran a classical stack, `stack_min`, as the slow fallback: the same detector, a perspective-n-point pose, an alpha-beta position filter and a stop-and-go guidance cascade in ANGLE mode.
 
 ![](figures/system_diagram.png)
 
@@ -132,7 +132,7 @@ Two models came out of the human labels, `gate_pose_hand434` and `gate_pose_hand
 
 ### 4.6 On the aircraft
 
-On the Orin, either model takes 27.4–27.6 ms per 640×360 frame on the GPU at the 25 W profile, 36 fps. FP16 changed nothing measurable. The whole producer loop from capture to published corners ran at 35.4 ms, and a 40 Hz consumer saw a mean packet age of 47 ms. Two models on one frame cost about 61 ms. The always-both dual-detector mode (Figure 8) therefore could not fly; the side-by-side comparison on the Orin was a viewing tool.
+On the Orin at the 25 W profile, the incumbent and the hybrid model each took 27.4–27.6 ms per 640×360 frame on the GPU, 36 fps, and FP16 changed nothing measurable. The hand-labelled model that flew measured 33.8 ms of inference inside a producer loop of 35.4 ms from capture to published corners, and a 40 Hz consumer saw a mean packet age of 47 ms. Two models on one frame cost about 61 ms. The always-both dual-detector mode (Figure 8) therefore could not fly; the side-by-side comparison on the Orin was a viewing tool.
 
 ![](figures/close_gate_models.png)
 

@@ -6,7 +6,7 @@
   <rdf:RDF xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:cc="http://creativecommons.org/ns#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
    <cc:Work>
     <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
-    <dc:date>2026-09-24T15:27:11.804374</dc:date>
+    <dc:date>2026-09-24T15:32:02.890858</dc:date>
     <dc:format>image/svg+xml</dc:format>
     <dc:creator>
      <cc:Agent>
@@ -35,7 +35,7 @@ L 464.256 203.606557
 L 464.256 16.406557 
 L 17.136 16.406557 
 z
-" clip-path="url(#p675ea868c1)" style="fill: #f3f2ee"/>
+" clip-path="url(#pc35f51367f)" style="fill: #f3f2ee"/>
    </g>
    <g id="patch_3">
     <path d="M 470.88 203.606557 
@@ -43,7 +43,7 @@ L 659.664 203.606557
 L 659.664 16.406557 
 L 470.88 16.406557 
 z
-" clip-path="url(#p675ea868c1)" style="fill: #faece6"/>
+" clip-path="url(#pc35f51367f)" style="fill: #faece6"/>
    </g>
    <g id="patch_4">
     <path d="M 17.136 369.32459 
@@ -51,10 +51,10 @@ L 659.664 369.32459
 L 659.664 218.95082 
 L 17.136 218.95082 
 z
-" clip-path="url(#p675ea868c1)" style="fill: #eef7f2"/>
+" clip-path="url(#pc35f51367f)" style="fill: #eef7f2"/>
    </g>
    <g id="text_1">
-    <text style="fill: #52514e; font: 6.8px 'Helvetica Neue', Helvetica, Arial, sans-serif; text-anchor: start" x="23.76" y="25.869888" transform="rotate(-0 23.76 25.869888)">on the Jetson Orin NX: Python, NumPy, OpenCV, no deep-learning framework</text>
+    <text style="fill: #52514e; font: 6.6px 'Helvetica Neue', Helvetica, Arial, sans-serif; text-anchor: start" x="23.76" y="25.71792" transform="rotate(-0 23.76 25.71792)">on the Jetson Orin NX: the detector in a torch venv; the policy in NumPy (the system Python has no deep-learning framework)</text>
    </g>
    <g id="text_2">
     <text style="fill: #52514e; font: 6.8px 'Helvetica Neue', Helvetica, Arial, sans-serif; text-anchor: start" x="477.504" y="27.7112" transform="rotate(-0 477.504 27.7112)">on the flight controller: Betaflight 4.4.3</text>
@@ -73,7 +73,7 @@ Q 25.7472 48.936393 25.7472 56.301639
 L 25.7472 139.160656 
 Q 25.7472 146.525902 33.696 146.525902 
 z
-" clip-path="url(#p675ea868c1)" style="fill: #e4eefb; stroke: #e4eefb; stroke-linejoin: miter"/>
+" clip-path="url(#pc35f51367f)" style="fill: #e4eefb; stroke: #e4eefb; stroke-linejoin: miter"/>
    </g>
    <g id="patch_6">
     <path d="M 149.616 146.525902 
@@ -86,7 +86,7 @@ Q 141.6672 48.936393 141.6672 56.301639
 L 141.6672 139.160656 
 Q 141.6672 146.525902 149.616 146.525902 
 z
-" clip-path="url(#p675ea868c1)" style="fill: #e4eefb; stroke: #e4eefb; stroke-linejoin: miter"/>
+" clip-path="url(#pc35f51367f)" style="fill: #e4eefb; stroke: #e4eefb; stroke-linejoin: miter"/>
    </g>
    <g id="patch_7">
     <path d="M 268.848 146.525902 
@@ -99,7 +99,7 @@ Q 260.8992 48.936393 260.8992 56.301639
 L 260.8992 139.160656 
 Q 260.8992 146.525902 268.848 146.525902 
 z
-" clip-path="url(#p675ea868c1)" style="fill: #e4eefb; stroke: #e4eefb; stroke-linejoin: miter"/>
+" clip-path="url(#pc35f51367f)" style="fill: #e4eefb; stroke: #e4eefb; stroke-linejoin: miter"/>
    </g>
    <g id="patch_8">
     <path d="M 391.392 146.525902 
@@ -112,7 +112,7 @@ Q 383.4432 48.936393 383.4432 56.301639
 L 383.4432 139.160656 
 Q 383.4432 146.525902 391.392 146.525902 
 z
-" clip-path="url(#p675ea868c1)" style="fill: #e4eefb; stroke: #e4eefb; stroke-linejoin: miter"/>
+" clip-path="url(#pc35f51367f)" style="fill: #e4eefb; stroke: #e4eefb; stroke-linejoin: miter"/>
    </g>
    <g id="patch_9">
     <path d="M 484.128 146.525902 
@@ -125,7 +125,7 @@ Q 476.1792 48.936393 476.1792 56.301639
 L 476.1792 139.160656 
 Q 476.1792 146.525902 484.128 146.525902 
 z
-" clip-path="url(#p675ea868c1)" style="fill: #fbe6dc; stroke: #fbe6dc; stroke-linejoin: miter"/>
+" clip-path="url(#pc35f51367f)" style="fill: #fbe6dc; stroke: #fbe6dc; stroke-linejoin: miter"/>
    </g>
    <g id="patch_10">
     <path d="M 580.176 146.525902 
@@ -138,7 +138,7 @@ Q 572.2272 48.936393 572.2272 56.301639
 L 572.2272 139.160656 
 Q 572.2272 146.525902 580.176 146.525902 
 z
-" clip-path="url(#p675ea868c1)" style="fill: #fbe6dc; stroke: #fbe6dc; stroke-linejoin: miter"/>
+" clip-path="url(#pc35f51367f)" style="fill: #fbe6dc; stroke: #fbe6dc; stroke-linejoin: miter"/>
    </g>
    <g id="text_4">
     <text style="fill: #52514e; font: 6.2px 'Helvetica Neue', Helvetica, Arial, sans-serif; text-anchor: middle" x="136.368" y="45.867541" transform="rotate(-0 136.368 45.867541)">30 fps</text>
@@ -154,7 +154,7 @@ z
     <text style="fill: #2a78d6; font: 6px 'Helvetica Neue', Helvetica, Arial, sans-serif" transform="translate(152.928 164.108232)">p95 20.3 ms with the stream running, on the same 115200-baud UART</text>
    </g>
    <g id="text_8">
-    <text style="fill: #eb6834; font: 6px 'Helvetica Neue', Helvetica, Arial, sans-serif; text-anchor: end" x="653.04" y="187.911194" transform="rotate(-0 653.04 187.911194)">adapter on the command path: inverts the rate and throttle curves, pitch sign -1, gyro counts / 16.384</text>
+    <text style="fill: #eb6834; font: 6px 'Helvetica Neue', Helvetica, Arial, sans-serif; text-anchor: end" x="653.04" y="187.911194" transform="rotate(-0 653.04 187.911194)">adapter on the command path: inverts the Betaflight rate curve (throttle is an identity map), pitch sign -1</text>
    </g>
    <g id="patch_11">
     <path d="M 37.008 352.139016 
@@ -167,7 +167,7 @@ Q 29.0592 260.687213 29.0592 268.052459
 L 29.0592 344.77377 
 Q 29.0592 352.139016 37.008 352.139016 
 z
-" clip-path="url(#p675ea868c1)" style="fill: #e8f6ef; stroke: #e8f6ef; stroke-linejoin: miter"/>
+" clip-path="url(#pc35f51367f)" style="fill: #e8f6ef; stroke: #e8f6ef; stroke-linejoin: miter"/>
    </g>
    <g id="patch_12">
     <path d="M 252.288 352.139016 
@@ -180,7 +180,7 @@ Q 244.3392 260.687213 244.3392 268.052459
 L 244.3392 344.77377 
 Q 244.3392 352.139016 252.288 352.139016 
 z
-" clip-path="url(#p675ea868c1)" style="fill: #e8f6ef; stroke: #e8f6ef; stroke-linejoin: miter"/>
+" clip-path="url(#pc35f51367f)" style="fill: #e8f6ef; stroke: #e8f6ef; stroke-linejoin: miter"/>
    </g>
    <g id="patch_13">
     <path d="M 477.504 352.139016 
@@ -193,7 +193,7 @@ Q 469.5552 260.687213 469.5552 268.052459
 L 469.5552 344.77377 
 Q 469.5552 352.139016 477.504 352.139016 
 z
-" clip-path="url(#p675ea868c1)" style="fill: #fdecec; stroke: #fdecec; stroke-linejoin: miter"/>
+" clip-path="url(#pc35f51367f)" style="fill: #fdecec; stroke: #fdecec; stroke-linejoin: miter"/>
    </g>
    <g id="text_9">
     <text style="fill: #0b0b0b; font: 600 7.6px 'Helvetica Neue', Helvetica, Arial, sans-serif; text-anchor: middle" x="78.408" y="63.303993" transform="rotate(-0 78.408 63.303993)">camera</text>
@@ -207,17 +207,17 @@ z
     <text style="fill: #0b0b0b; font: 600 7.6px 'Helvetica Neue', Helvetica, Arial, sans-serif; text-anchor: middle" x="195.984" y="63.303993" transform="rotate(-0 195.984 63.303993)">gate detector</text>
    </g>
    <g id="text_12">
-    <text style="fill: #0b0b0b; font: 5.9px 'Helvetica Neue', Helvetica, Arial, sans-serif" transform="translate(160.588609 123.823606)">YOLOv8n-pose hand497</text>
-    <text style="fill: #0b0b0b; font: 5.9px 'Helvetica Neue', Helvetica, Arial, sans-serif" transform="translate(160.226312 130.878623)">640x360, 27 ms on GPU</text>
+    <text style="fill: #0b0b0b; font: 5.9px 'Helvetica Neue', Helvetica, Arial, sans-serif" transform="translate(138.014656 123.823606)">YOLOv8n-pose, hand434 then hand497</text>
+    <text style="fill: #0b0b0b; font: 5.9px 'Helvetica Neue', Helvetica, Arial, sans-serif" transform="translate(148.64157 130.878623)">~30 ms on the GPU, 35 ms loop</text>
     <text style="fill: #0b0b0b; font: 5.9px 'Helvetica Neue', Helvetica, Arial, sans-serif" transform="translate(161.912422 137.93364)">8 corners, kp conf 0.25</text>
    </g>
    <g id="text_13">
     <text style="fill: #0b0b0b; font: 600 7.6px 'Helvetica Neue', Helvetica, Arial, sans-serif; text-anchor: middle" x="318.528" y="63.303993" transform="rotate(-0 318.528 63.303993)">observation</text>
    </g>
    <g id="text_14">
-    <text style="fill: #0b0b0b; font: 5.9px 'Helvetica Neue', Helvetica, Arial, sans-serif" transform="translate(279.893141 123.823606)">55 ch x 32 frames = 1760</text>
-    <text style="fill: #0b0b0b; font: 5.9px 'Helvetica Neue', Helvetica, Arial, sans-serif" transform="translate(278.788734 130.878623)">latched 30 Hz, delayed 1-4</text>
-    <text style="fill: #0b0b0b; font: 5.9px 'Helvetica Neue', Helvetica, Arial, sans-serif" transform="translate(278.761078 137.93364)">tracker picks the next gate</text>
+    <text style="fill: #0b0b0b; font: 5.9px 'Helvetica Neue', Helvetica, Arial, sans-serif" transform="translate(265.658008 123.823606)">55 ch x 32 frames = 1760, at 40 Hz</text>
+    <text style="fill: #0b0b0b; font: 5.9px 'Helvetica Neue', Helvetica, Arial, sans-serif" transform="translate(275.419742 130.878623)">from the latest corner packet</text>
+    <text style="fill: #0b0b0b; font: 5.9px 'Helvetica Neue', Helvetica, Arial, sans-serif" transform="translate(264.513961 137.93364)">(coasts through gaps); gyro / 16.384</text>
    </g>
    <g id="text_15">
     <text style="fill: #0b0b0b; font: 600 7.6px 'Helvetica Neue', Helvetica, Arial, sans-serif; text-anchor: middle" x="419.544" y="63.303993" transform="rotate(-0 419.544 63.303993)">policy</text>
@@ -240,8 +240,8 @@ z
     <text style="fill: #0b0b0b; font: 600 7.6px 'Helvetica Neue', Helvetica, Arial, sans-serif" transform="translate(598.163094 71.236849)">motors</text>
    </g>
    <g id="text_20">
-    <text style="fill: #0b0b0b; font: 5.9px 'Helvetica Neue', Helvetica, Arial, sans-serif" transform="translate(594.734508 123.823606)">440 deg/s at</text>
-    <text style="fill: #0b0b0b; font: 5.9px 'Helvetica Neue', Helvetica, Arial, sans-serif" transform="translate(600.968227 130.878623)">full stick</text>
+    <text style="fill: #0b0b0b; font: 5.9px 'Helvetica Neue', Helvetica, Arial, sans-serif" transform="translate(589.249813 123.823606)">440 deg/s at full</text>
+    <text style="fill: #0b0b0b; font: 5.9px 'Helvetica Neue', Helvetica, Arial, sans-serif" transform="translate(590.678719 130.878623)">stick (yaw 380)</text>
     <text style="fill: #0b0b0b; font: 5.9px 'Helvetica Neue', Helvetica, Arial, sans-serif" transform="translate(594.129297 137.93364)">DShot300 x4</text>
    </g>
    <g id="text_21">
@@ -271,72 +271,72 @@ z
    <g id="patch_14">
     <path d="M 131.746078 93.127869 
 Q 136.368273 93.127869 139.648827 93.127869 
-" clip-path="url(#p675ea868c1)" style="fill: none; stroke: #52514e; stroke-width: 1.2; stroke-linecap: round"/>
+" clip-path="url(#pc35f51367f)" style="fill: none; stroke: #52514e; stroke-width: 1.2; stroke-linecap: round"/>
     <path d="M 135.248827 90.927869 
 L 139.648827 93.127869 
 L 135.248827 95.327869 
 z
-" clip-path="url(#p675ea868c1)" style="fill: #52514e; stroke: #52514e; stroke-width: 1.2; stroke-linecap: round"/>
+" clip-path="url(#pc35f51367f)" style="fill: #52514e; stroke: #52514e; stroke-width: 1.2; stroke-linecap: round"/>
    </g>
    <g id="patch_15">
     <path d="M 250.978078 93.127869 
 Q 255.600273 93.127869 258.880827 93.127869 
-" clip-path="url(#p675ea868c1)" style="fill: none; stroke: #52514e; stroke-width: 1.2; stroke-linecap: round"/>
+" clip-path="url(#pc35f51367f)" style="fill: none; stroke: #52514e; stroke-width: 1.2; stroke-linecap: round"/>
     <path d="M 254.480827 90.927869 
 L 258.880827 93.127869 
 L 254.480827 95.327869 
 z
-" clip-path="url(#p675ea868c1)" style="fill: #52514e; stroke: #52514e; stroke-width: 1.2; stroke-linecap: round"/>
+" clip-path="url(#pc35f51367f)" style="fill: #52514e; stroke: #52514e; stroke-width: 1.2; stroke-linecap: round"/>
    </g>
    <g id="patch_16">
     <path d="M 376.835695 93.127869 
 Q 379.800627 93.127869 381.423917 93.127869 
-" clip-path="url(#p675ea868c1)" style="fill: none; stroke: #52514e; stroke-width: 1.2; stroke-linecap: round"/>
+" clip-path="url(#pc35f51367f)" style="fill: none; stroke: #52514e; stroke-width: 1.2; stroke-linecap: round"/>
     <path d="M 377.023917 90.927869 
 L 381.423917 93.127869 
 L 377.023917 95.327869 
 z
-" clip-path="url(#p675ea868c1)" style="fill: #52514e; stroke: #52514e; stroke-width: 1.2; stroke-linecap: round"/>
+" clip-path="url(#pc35f51367f)" style="fill: #52514e; stroke: #52514e; stroke-width: 1.2; stroke-linecap: round"/>
    </g>
    <g id="patch_17">
     <path d="M 456.320865 93.127869 
 Q 465.913009 93.127869 473.716298 93.127869 
-" clip-path="url(#p675ea868c1)" style="fill: none; stroke: #eb6834; stroke-width: 1.6; stroke-linecap: round"/>
+" clip-path="url(#pc35f51367f)" style="fill: none; stroke: #eb6834; stroke-width: 1.6; stroke-linecap: round"/>
     <path d="M 469.316298 90.927869 
 L 473.716298 93.127869 
 L 469.316298 95.327869 
 z
-" clip-path="url(#p675ea868c1)" style="fill: #eb6834; stroke: #eb6834; stroke-width: 1.6; stroke-linecap: round"/>
+" clip-path="url(#pc35f51367f)" style="fill: #eb6834; stroke: #eb6834; stroke-width: 1.6; stroke-linecap: round"/>
    </g>
    <g id="patch_18">
     <path d="M 565.619695 93.127869 
 Q 568.584627 93.127869 570.207917 93.127869 
-" clip-path="url(#p675ea868c1)" style="fill: none; stroke: #52514e; stroke-width: 1.2; stroke-linecap: round"/>
+" clip-path="url(#pc35f51367f)" style="fill: none; stroke: #52514e; stroke-width: 1.2; stroke-linecap: round"/>
     <path d="M 565.807917 90.927869 
 L 570.207917 93.127869 
 L 565.807917 95.327869 
 z
-" clip-path="url(#p675ea868c1)" style="fill: #52514e; stroke: #52514e; stroke-width: 1.2; stroke-linecap: round"/>
+" clip-path="url(#pc35f51367f)" style="fill: #52514e; stroke: #52514e; stroke-width: 1.2; stroke-linecap: round"/>
    </g>
    <g id="patch_19">
     <path d="M 475.500305 133.022951 
 Q 398.012954 133.022951 321.867244 133.022951 
-" clip-path="url(#p675ea868c1)" style="fill: none; stroke: #2a78d6; stroke-width: 1.2; stroke-linecap: round"/>
+" clip-path="url(#pc35f51367f)" style="fill: none; stroke: #2a78d6; stroke-width: 1.2; stroke-linecap: round"/>
     <path d="M 326.267244 135.222951 
 L 321.867244 133.022951 
 L 326.267244 130.822951 
 z
-" clip-path="url(#p675ea868c1)" style="fill: #2a78d6; stroke: #2a78d6; stroke-width: 1.2; stroke-linecap: round"/>
+" clip-path="url(#pc35f51367f)" style="fill: #2a78d6; stroke: #2a78d6; stroke-width: 1.2; stroke-linecap: round"/>
    </g>
    <g id="patch_20">
     <path d="M 164.646741 288.628623 
 Q 331.50871 204.098665 517.217797 203.612896 
-" clip-path="url(#p675ea868c1)" style="fill: none; stroke: #008300; stroke-width: 1.2; stroke-linecap: round"/>
+" clip-path="url(#pc35f51367f)" style="fill: none; stroke: #008300; stroke-width: 1.2; stroke-linecap: round"/>
     <path d="M 512.812057 201.424413 
 L 517.217797 203.612896 
 L 512.823566 205.824398 
 z
-" clip-path="url(#p675ea868c1)" style="fill: #008300; stroke: #008300; stroke-width: 1.2; stroke-linecap: round"/>
+" clip-path="url(#pc35f51367f)" style="fill: #008300; stroke: #008300; stroke-width: 1.2; stroke-linecap: round"/>
    </g>
    <g id="text_27">
     <g id="patch_21">
@@ -357,7 +357,7 @@ z
   </g>
  </g>
  <defs>
-  <clipPath id="p675ea868c1">
+  <clipPath id="pc35f51367f">
    <rect x="7.2" y="7.2" width="662.4" height="374.4"/>
   </clipPath>
  </defs>
