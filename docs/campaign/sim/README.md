@@ -52,9 +52,9 @@ The simulator is a fork of [Kousheek Chakraborty's `isaac_drone_racer`](https://
 - An alpha-beta filter carries position between fixes. Hover throttle is learned in flight. Blind, the stack can only sink; three seconds without a fix lands it.
 - Guidance is a state machine: take off, stage 3.5 m out, hold until aligned, creep through at 1.2 m/s, hover and turn to the next gate. Lean capped at 15°, about 1 m/s.
 
-![Ten seconds of the classical fallback stack in Isaac: chase view on the left, the drone's own camera with detections on the right](paper/figures/stack_pov.gif)
+![Ten seconds of the classical fallback stack in Isaac: chase view above, the drone's own camera with detections below](paper/figures/stack_pov.gif)
 
-*The stack in Isaac against a pessimistic sensor model (every gate detected, gate-shaped false positives, sticky corner dropout, latency, an unknown self-levelling gain), chase view beside its own camera. 64 aircraft per configuration: the hover-and-turn after each gate took three-gate success from 84% to 95%; the gate-6 detour took that gate from 0 of 64 to 64 of 64. Section 7 of the paper has the full account, including its one flight, which hit the ceiling.*
+*The stack in Isaac against a pessimistic sensor model (every gate detected, gate-shaped false positives, sticky corner dropout, latency, an unknown self-levelling gain), chase view above its own camera. 64 aircraft per configuration: the hover-and-turn after each gate took three-gate success from 84% to 95%; the gate-6 detour took that gate from 0 of 64 to 64 of 64. Section 7 of the paper has the full account, including its one flight, which hit the ceiling.*
 
 ## Documentation
 
@@ -162,7 +162,7 @@ Isaac Sim 4.5, Isaac Lab 2.1.0 and **skrl 1.4.2** (not 2.x; Isaac Lab 2.1 uses t
 |---|---|
 | [`race_best.mp4`](paper/videos/race_best.mp4) | an early chase-camera recording from before the start fixes; that checkpoint had not trained a takeoff from this position and the run does not complete the course. To be replaced by a recording of `race40drop` with its own camera view |
 | [`race_start_from_pad.mp4`](paper/videos/race_start_from_pad.mp4) | the 40 Hz policy taking off from the competition pad and through gate 1, 6.7 s |
-| [`stack_run_01.mp4`](paper/videos/stack_run_01.mp4), [`02`](paper/videos/stack_run_02.mp4), [`03`](paper/videos/stack_run_03.mp4) | the classical fallback stack, chase view beside its own camera with detections, 60 s each |
+| [`stack_run_01.mp4`](paper/videos/stack_run_01.mp4), [`02`](paper/videos/stack_run_02.mp4), [`03`](paper/videos/stack_run_03.mp4) | the classical fallback stack, chase view above its own camera with detections, 60 s each |
 
 A recording of the current policy (`race40drop`) racing, side by side with its own camera view, is not made yet; `scripts/diag/record_race_pov.py` produces it on any machine with Isaac Sim (`docs/HANDOFF_WINDOWS_RECORDING.md`).
 
