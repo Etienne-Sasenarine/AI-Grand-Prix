@@ -165,14 +165,14 @@ Figure 17 is the result that the retrained chain produced on its own terms. In I
 
 \begin{figure}[htbp]\centering\includegraphics[width=\linewidth,height=0.60\textheight,keepaspectratio]{race40drop_first_lap.png}
 \caption{The 40 Hz racing policy trained under corner dropout (\texttt{race40drop}, leg 35) flying the full course in Isaac from the competition pad; 36 of 64 aircraft completed the first lap. Left: every aircraft's path in blue, one aircraft's path coloured by height, black bars the gates and red arrows the required direction. Top right: height over the first lap against the 1.35 m gate centres and the 4.05 m upper opening of gate 9. Bottom right: when each gate was passed.}\end{figure}
-Figure 18 is the policy's own camera during a simulated run. Figures 19 and 20 are the recordings themselves: the takeoff from the competition pad that the start fixes of Section 5.5 made possible, and the best racing checkpoint from a chase camera. They animate on GitHub; the PDF shows one frame of each with a link to the file.
+Figure 18 is the policy's own camera during a simulated run. Figures 19 and 20 are recordings: the takeoff from the competition pad that the start fixes of Section 5.5 made possible, and an earlier chase-camera run from before those fixes, kept for the flying itself rather than the outcome. They animate on GitHub; the PDF shows one frame of each with a link to the file.
 
 \begin{figure}[htbp]\centering\includegraphics[width=\linewidth,height=0.60\textheight,keepaspectratio]{race_contact_sheet.jpg}
 \caption{Contact sheet from the onboard camera in Isaac during a racing episode, one tile every 0.5 s for 20 s.}\end{figure}
 \begin{figure}[htbp]\centering\includegraphics[width=\linewidth,height=0.42\textheight,keepaspectratio]{race_start_from_pad_still.png}
 \caption{The 40 Hz racing policy starting on the floor 7.4 m before gate 1 and flying through it, in Isaac (\href{https://github.com/bojro/aigp-sim/blob/main/paper/videos/race_start_from_pad.mp4}{race\_start\_from\_pad.mp4}, 6.7 s). Before the start-distribution fixes of Section 5.5 this takeoff succeeded in zero of 456 attempts; after them, 86.3\% of pad starts pass gate 1.}\end{figure}
 \begin{figure}[htbp]\centering\includegraphics[width=\linewidth,height=0.42\textheight,keepaspectratio]{race_best_still.png}
-\caption{The best racing checkpoint on the corrected course from a chase camera (\href{https://github.com/bojro/aigp-sim/blob/main/paper/videos/race_best.mp4}{race\_best.mp4}, 9.9 s).}\end{figure}
+\caption{An early chase-camera recording of a racing checkpoint from before the start fixes (\href{https://github.com/bojro/aigp-sim/blob/main/paper/videos/race_best.mp4}{race\_best.mp4}, 9.9 s). That checkpoint had not trained a takeoff from this position and the run does not complete the course; a recording of the final \texttt{race40drop} policy with its own camera view is still to be made.}\end{figure}
 \section{The aircraft, measured}
 Everything below was measured between 18 and 21 September with the propellers off, the aircraft never armed, and the Betaflight console untouched. Each item overturned something a runner had assumed.
 

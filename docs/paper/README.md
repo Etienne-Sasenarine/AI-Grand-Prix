@@ -19,7 +19,7 @@ not LFS):
 | file | what it shows |
 |---|---|
 | `race_start_from_pad.mp4` | the 40 Hz racing policy taking off from the competition pad and passing gate 1 (Isaac, 6.7 s) |
-| `race_best.mp4` | the best racing checkpoint from a chase camera (Isaac, 9.9 s) |
+| `race_best.mp4` | an early chase-camera run from before the start fixes (Isaac, 9.9 s); that checkpoint had not trained a takeoff from this position and does not complete the course. To be replaced by a `race40drop` recording |
 | `stack_run_01..03.mp4` | the classical fallback stack in Isaac: chase view on the left, the drone's own camera with the simulated detector's corners on the right (60 s each) |
 
 ## Rebuilding it

@@ -4,9 +4,9 @@
 
 The whole project, across all three repositories, is written up in **[the paper](paper/paper.md)** ([PDF](paper/paper.pdf), NeurIPS style).
 
-![The best racing checkpoint flying the course in Isaac, chase camera](paper/figures/race_best.gif)
+![The racing policy taking off from the competition pad and through gate 1](paper/figures/race_start_from_pad.gif)
 
-*The best racing checkpoint on the corrected course, chase camera, in Isaac Sim ([race_best.mp4](paper/videos/race_best.mp4)).*
+*The pad start: the 40 Hz policy on the floor 7.4 m before gate 1, up and through it, in Isaac Sim ([race_start_from_pad.mp4](paper/videos/race_start_from_pad.mp4)). Before the spawn fixes this succeeded in 0 of 456 attempts.*
 
 ![The 40 Hz racing policy trained under corner dropout flying the full course in Isaac from the competition pad: 36 of 64 aircraft completed the first lap](paper/figures/race40drop_first_lap.png)
 
@@ -23,10 +23,6 @@ The whole project, across all three repositories, is written up in **[the paper]
 | Full racing run | ~48 min, ~$0.70 | 4096 environments, RTX 6000 Ada |
 
 Both racing checkpoints are in [`checkpoints/`](checkpoints/). Nothing trained here flew props-on; the paper's Sections 6 and 7 say why, and what the aircraft measured.
-
-![The racing policy taking off from the competition pad and through gate 1](paper/figures/race_start_from_pad.gif)
-
-*The pad start: on the floor 7.4 m before gate 1, up and through it ([race_start_from_pad.mp4](paper/videos/race_start_from_pad.mp4)). Before the spawn fixes this succeeded in 0 of 456 attempts.*
 
 ## What was built here
 
@@ -153,11 +149,11 @@ Isaac Sim 4.5, Isaac Lab 2.1.0 and **skrl 1.4.2** (not 2.x; Isaac Lab 2.1 uses t
 
 | file | what it shows |
 |---|---|
-| [`race_best.mp4`](paper/videos/race_best.mp4) | the best racing checkpoint, chase camera, 9.9 s |
+| [`race_best.mp4`](paper/videos/race_best.mp4) | an early chase-camera recording from before the start fixes; that checkpoint had not trained a takeoff from this position and the run does not complete the course. To be replaced by a recording of `race40drop` with its own camera view |
 | [`race_start_from_pad.mp4`](paper/videos/race_start_from_pad.mp4) | the 40 Hz policy taking off from the competition pad and through gate 1, 6.7 s |
 | [`stack_run_01.mp4`](paper/videos/stack_run_01.mp4), [`02`](paper/videos/stack_run_02.mp4), [`03`](paper/videos/stack_run_03.mp4) | the classical fallback stack, chase view beside its own camera with detections, 60 s each |
 
-A side-by-side recording of the policy with its own camera view is not made yet; `scripts/diag/record_race_pov.py` produces it on any machine with Isaac Sim (`docs/HANDOFF_WINDOWS_RECORDING.md`).
+A recording of the current policy (`race40drop`) racing, side by side with its own camera view, is not made yet; `scripts/diag/record_race_pov.py` produces it on any machine with Isaac Sim (`docs/HANDOFF_WINDOWS_RECORDING.md`).
 
 ## The other two repositories
 

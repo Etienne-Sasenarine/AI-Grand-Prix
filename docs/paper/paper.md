@@ -220,7 +220,7 @@ Figure 17 is the result that the retrained chain produced on its own terms. In I
 
 *Figure 17. The 40 Hz racing policy trained under corner dropout (`race40drop`, leg 35) flying the full course in Isaac from the competition pad; 36 of 64 aircraft completed the first lap. Left: every aircraft's path in blue, one aircraft's path coloured by height, black bars the gates and red arrows the required direction. Top right: height over the first lap against the 1.35 m gate centres and the 4.05 m upper opening of gate 9. Bottom right: when each gate was passed.*
 
-Figure 18 is the policy's own camera during a simulated run. Figures 19 and 20 are the recordings themselves: the takeoff from the competition pad that the start fixes of Section 5.5 made possible, and the best racing checkpoint from a chase camera. They animate on GitHub; the PDF shows one frame of each with a link to the file.
+Figure 18 is the policy's own camera during a simulated run. Figures 19 and 20 are recordings: the takeoff from the competition pad that the start fixes of Section 5.5 made possible, and an earlier chase-camera run from before those fixes, kept for the flying itself rather than the outcome. They animate on GitHub; the PDF shows one frame of each with a link to the file.
 
 ![](figures/race_contact_sheet.jpg)
 
@@ -232,7 +232,7 @@ Figure 18 is the policy's own camera during a simulated run. Figures 19 and 20 a
 
 ![](figures/race_best.gif)
 
-*Figure 20. The best racing checkpoint on the corrected course from a chase camera ([race_best.mp4](https://github.com/bojro/aigp-sim/blob/main/paper/videos/race_best.mp4), 9.9 s).*
+*Figure 20. An early chase-camera recording of a racing checkpoint from before the start fixes ([race_best.mp4](https://github.com/bojro/aigp-sim/blob/main/paper/videos/race_best.mp4), 9.9 s). That checkpoint had not trained a takeoff from this position and the run does not complete the course; a recording of the final `race40drop` policy with its own camera view is still to be made.*
 
 ## 6. The aircraft, measured
 
