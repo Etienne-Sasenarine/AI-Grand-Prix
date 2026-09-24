@@ -14,7 +14,7 @@ never trust an exit code from anything in this stack.
 
 ---
 
-# Part 1 — The sequence that works
+# Part 1: The sequence that works
 
 ## 1. Deploy the pod
 
@@ -122,7 +122,7 @@ private repo would hang waiting for credentials (§3 below). Verify:
 
 ```bash
 head -c 12 assets/5_in_drone/configuration/5_in_drone_base.usd | grep -q git-lfs \
-  && echo "POINTER — broken" || echo "real USD"
+  && echo "POINTER, broken" || echo "real USD"
 du -h assets/5_in_drone/configuration/5_in_drone_base.usd   # expect ~98M
 ```
 
@@ -246,7 +246,7 @@ checkpoint you can lose entirely.
 
 ---
 
-# Part 2 — Sizing a run
+# Part 2: Sizing a run
 
 On a rented box "how many environments", "how long" and "how much" are one
 question. The arithmetic, so a run can be costed before it is started rather
@@ -301,7 +301,7 @@ notices has hung.
 
 ---
 
-# Part 3 — Failure catalogue
+# Part 3: Failure catalogue
 
 Everything that went wrong on 20 Sep, in the order it bit. Each entry appears
 once; the working sequence above already routes around all of them.

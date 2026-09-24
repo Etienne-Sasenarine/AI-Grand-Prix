@@ -134,7 +134,7 @@ moments 0.30/0.30/0.20) had on the 0.5 kg aircraft. Left as pinned numbers on
 the corrected inertia they gave pitch a 66 ms time constant (+84%), and the
 first corrected-plant run lost 73% of its episodes to gate strikes.
 
-Two honest limits. Physics at 120 Hz (dt 8.3 ms) cannot represent a time
+Two limits. Physics at 120 Hz (dt 8.3 ms) cannot represent a time
 constant much below ~25 ms, and a real Betaflight rate loop on this class of
 aircraft settles in single-digit milliseconds. The simulated aircraft is
 therefore slower to respond than the real one, in the direction that makes the

@@ -103,7 +103,7 @@ Isaac Sim 4.5, Isaac Lab 2.1.0 and **skrl 1.4.2** (not 2.x; Isaac Lab 2.1 uses t
 * **The A100 is the wrong card.** GA100 is the one Ampere die without RT cores and Isaac Sim needs a Vulkan device even headless. L40S, RTX 6000 Ada, A10G or a 4090 all work.
 * **On Linux, export `LD_LIBRARY_PATH`** (WSL: `/usr/lib/wsl/lib`) before training, or PhysX cannot find `libcuda.so`, silently falls back to the CPU solver, and runs ~100× slower while appearing to work.
 
-## State, honestly
+## What is and is not modelled
 
 * **Latency is modelled**: 0–2 policy steps of action delay, a first-order lag on the rate setpoint matching the FC's measured 15 Hz setpoint filter, and a 1–4 step vision delay behind a 30 Hz camera latch, all randomised per episode.
 * **Corner dropout is calibrated**; corner *misplacement* (`AIGP_KP_JITTER_PX`) is not, and defaults to 0.
