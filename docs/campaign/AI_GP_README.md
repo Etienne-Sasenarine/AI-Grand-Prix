@@ -1,6 +1,6 @@
 # AI_GP
 
-**Team Electric Fire's flight client for the AI Grand Prix physical qualifier** (Anduril LC3, Santa Ana, 15–22 September 2026). This repository holds what ran, or was built to run, on the aircraft's Jetson Orin NX: the MSP link to the Betaflight flight controller, the runners that fly a trained policy, the classical fallback stack, the bench tools that measured the aircraft, and the documents written on site.
+**Our flight client for the AI Grand Prix physical qualifier** (Anduril LC3, Santa Ana, 15–22 September 2026). This repository holds what ran, or was built to run, on the aircraft's Jetson Orin NX: the MSP link to the Betaflight flight controller, the runners that fly a trained policy, the classical fallback stack, the bench tools that measured the aircraft, and the documents written on site.
 
 Two sibling repositories hold the rest of the work, and the write-up of all three is the [paper](https://github.com/bojro/aigp-sim/blob/main/paper/paper.md) ([PDF](https://github.com/bojro/aigp-sim/blob/main/paper/paper.pdf)):
 
@@ -53,4 +53,4 @@ Never validated: props-on policy flight, automatic takeoff or landing, any posit
 
 ## Team
 
-We are Team Electric Fire, Cornell University: Geneustace Wicaksono, Bojro Das (College of Arts and Sciences), Etienne Sasenarine, John Apessos, Grant Lin, Narayan Topalli and Aaron Legg (College of Engineering). The MSP library and camera toolchain under `pq/target/` are the organizers'. The simulator descends from Kousheek Chakraborty's `isaac_drone_racer` (BSD-3-Clause).
+We are a Cornell University team: Geneustace Wicaksono, Bojro Das (College of Arts and Sciences), Etienne Sasenarine, John Apessos, Grant Lin, Narayan Topalli and Aaron Legg (College of Engineering). The MSP library and camera toolchain under `pq/target/` are the organizers'. The simulator descends from Kousheek Chakraborty's `isaac_drone_racer` (BSD-3-Clause).
