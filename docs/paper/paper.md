@@ -28,7 +28,7 @@ We claim four contributions.
 1. **A perception pipeline** that bootstraps gate-corner labels from the gate's own geometry, lets a detector propose where geometry cannot trace, and then replaces both with human labels once the self-scored accuracy turns out to be optimistic by a factor of six (Section 4).
 2. **A simulation and training stack** built around an explicit, hashed observation contract shared by simulator and aircraft, with a plant model whose mass is measured and whose rate-loop gains are derived, latency and vision-delay modelling, and a corner-dropout augmentation calibrated on the real detector (Section 5).
 3. **Bench measurements on the real aircraft** settling the control rate, the gyro scale, the axis conventions and the stick mapping. At least one runner had assumed each of them wrongly before it was measured (Section 6).
-4. **A documented sequence of events** from working simulator to the end of the week, with the hardware incidents in order (Section 7), an engineering retrospective on the software-to-hardware seam (Section 8), and the lessons we would carry into a second attempt (Section 9).
+4. **A documented sequence of events** from working simulator to the end of the week, the fallback stack the team turned to and why (Section 7), the hardware incidents in order (Section 8), an engineering retrospective on the software-to-hardware seam (Section 9), and the lessons we would carry into a second attempt (Section 10).
 
 ## 2. The competition, the course and the aircraft
 
@@ -70,7 +70,7 @@ Every autonomous racer runs the same loop. Find the gates in the image; estimate
 | Jul 2026 | Virtual qualifier 2 removed position telemetry. YOLO corners + IMU dead reckoning (`Q2_pnp`, passed gates 1–2); a 16-state dual-gate EKF (`Q2_kalman`); a DreamerV3 world model (168k steps, zero gates, deleted) | No autonomous lap; human personal best 35.96 s |
 | Aug 2026 | Li & de Croon style classical stack; a snake-gate detector; HG-DAgger imitation of 17–18 human laps with a temporal-convolutional policy | Human best 14.04 s; the imitation policy "leaves the pad and will crash" |
 | 30 Aug–16 Sep | Isaac Lab PPO on a digitised copy of the physical course; keeper checkpoint `pq_speed_best` at 33 gates per 40 s episode | Fast but brittle (Section 5.4); abandoned on the corrected simulator |
-| 17–22 Sep | On site: MSP adapter, bench measurements, hand-labelled gate detector, 40 Hz retrains with dropout, three hover runners, a classical "stack_min" fallback in simulation | No scored autonomous run; all four aircraft grounded (Section 7) |
+| 17–22 Sep | On site: MSP adapter, bench measurements, hand-labelled gate detector, 40 Hz retrains with dropout, three hover runners, a classical "stack_min" fallback in simulation | No scored autonomous run; all four aircraft grounded (Section 8) |
 
 *Table 1. The eras of the project. The branch names in the archived repository match the middle column.*
 
@@ -274,30 +274,86 @@ Four hover logs from 18 September were worthless as hover measurements. One of t
 
 Shadow mode runs the whole chain, camera to policy, and logs the command it would have sent while transmitting nothing; a test parses the source to prove the send path is structurally unreachable. At the hover pose on 21 September, before the keypoint-threshold and history-gap fixes, the runner obtained 15 usable observations from 1262 frames. The 20° upward tilt hides both bottom corners at that pose, which is why the minimum visible corners was later lowered from four to three. Earlier still, a static observation with four visible corners had drawn a confident 1636 µs throttle command from the policy, against a hover estimate of 1233 µs. A degraded view does not produce a degraded command. It produces a confident wrong one.
 
-## 7. Flight attempts, and what the aircraft did
+## 7. The fallback: a classical perception stack
+
+### 7.1 Why putting the policy on the aircraft was expensive
+
+By 19 September the team had a racing policy that lapped the simulator and a hover policy that held station, and had decided to defer both in favour of something slower. The reasons were specific, and each one made a policy flight cost more than a flight should.
+
+**The policy had trained on perfect vision.** In the simulator the eight corners are projected analytically from the true gate pose on every frame, never missing and never misplaced. On the aircraft the detector delivered four usable corners on 67% of frames at the best threshold, the policy's six-frame history was intact 59% of the time, and the misses came in runs. Applied at evaluation only, that measured dropout cost the racing policy 71% of its gates. A dropout-trained chain, `race40drop`, was started on 21 September and reached 10.23 gates per episode against the perfect-corner policy's 15.27, but it existed for one day and never flew. Corner *misplacement* was never calibrated: the jitter knob defaulted to zero. And the detector itself had learned from a person walking around a gate, not from flight.
+
+**Every input had to match to the number.** The observation is 1760 values whose meaning is fixed by convention: channel order, sentinels, clips, units, signs. A mismatch raises nothing; the policy flies confidently on the wrong numbers. Three such mismatches were found on the aircraft (gyro counts read as degrees, an inverted pitch axis, a 2.4× rate map) and each one was found by measuring, after a runner had already carried it.
+
+**The rate was wrong until the last day.** The policies trained at 60 Hz; the link supports 40 (Section 6.1). Run at 40 Hz the hover policy lost a third of its settled time. The 40 Hz retrains landed on 21 September.
+
+**A policy needs ACRO, and ACRO has no floor.** The policy commands body rates, so the flight controller must be in rate mode, without self-levelling. Whatever goes wrong, the aircraft stays at the attitude it was last commanded to, and the firmware holds that command if the stream stops. The only abort is the pilot flipping the override switch and then flying a 1.7 kg aircraft by hand in rate mode, which nobody on the team could do for more than a second.
+
+**Nothing around the policy had been validated.** Takeoff, landing, hover hold and position hold had never been demonstrated on the aircraft, and each props-on attempt risked one of four airframes. Every change to the runner re-opened the props-off handover check. An iteration was therefore hours of upload, bench and cage time, and the first props-on attempt lasted 0.45 s.
+
+The fallback was designed to remove those costs rather than to race: fly in ANGLE mode so a fault is a level hover, command lean angles capped at 15° and speeds around 1 m/s, take height from the gate in view, stop before each gate, and land on any loss of confidence.
+
+### 7.2 What it is
+
+A deterministic stack in three layers, assembled from pieces that already existed. The hardware pieces are the teammate's: a serial link that streams sticks in a thread that never stops, a perception thread running the YOLO detector, and an adapter from lean angles and throttle to RC channels with the measured axis signs. The maths is the `pq/flight` NumPy stack written on 17 September: camera geometry, planar PnP, a pose filter and a guidance cascade. The decision layer, `stack_min`, is deliberately small, with every alternative exposed as a parameter so a simulator could compare them. Its frozen settings for deployment: associate detections to gates by predicted position; stop-and-go through each gate; ANGLE-mode lean commands; take off first, straight up to 1.35 m; learn the hover throttle in flight; a hover stick of 0.34 with a cap of 0.45; 15° tilt limit; 1.0 m/s cruise and 1.2 m/s through the gate; a 1 rad/s yaw cap; a hover-and-turn after each gate; a detour around gate 6; and a landing after three seconds without a fix.
+
+### 7.3 Perception: a gate pose from eight corners
+
+The gate is a planar target of known size, so its pose follows from the corners by planar PnP (IPPE, the same method Swift uses), which OpenCV ships and the Jetson image already has. Two details make the module longer than a one-line call. Planar PnP is two-fold ambiguous: a flat target admits a mirrored pose that reprojects almost as well, and near head-on the two are numerically indistinguishable. The stack breaks the tie with gravity: the flight controller reports roll and pitch, so the camera knows which way is down, and a gate's own up-axis must point against it; the mirrored solution does not, and is rejected by a dot product. Second, the PnP rotation is thrown away. The flight controller's attitude is better than anything four coplanar points can give, so the stack keeps only PnP's range and bearing and combines them with the FC's attitude to place the camera in the gate's frame. Under 2 px of corner noise at 8 m that gives 0.09 m of position error against 2.12 m for the full six-degree-of-freedom solution. Solves with more than 8 px of reprojection error are dropped.
+
+Which gate a detection belongs to is decided in metres, not pixels. Every detection is turned into a position hypothesis and matched to the map gate nearest where the stack believes it is. The course makes this forgiving: the closest two gates are 7.54 m apart, and a single gate's range from PnP at 10 m is good to about 0.4 m with 5 px of corner noise, a margin of twenty. There is no need to recognise gates individually, which is fortunate because they are identical.
+
+### 7.4 Estimation without a velocity sensor
+
+There is no position sensor and no usable height sensor, so between gate fixes the stack carries itself on the last fix. A simple alpha-beta filter tracks position, and velocity is the filtered difference of fixes with a step limit, chosen for about a third less tilt rate while holding than the sharper alternative. The hover throttle is learned in flight from fixes within a metre of the predicted position horizontally, on the argument that a wrong gate shows up as a sideways jump while a hover error shows up only in height; the learned correction is limited to ±15%. When no gate is in view the stack is blind and behaves accordingly: it holds the learned hover throttle or slightly under it, so that it can only sink slowly, never climb on a guess. Three seconds without a fix commands a landing, which cannot be cancelled by a later fix.
+
+### 7.5 Guidance: a state machine at walking pace
+
+Take off straight up to gate height. Fly to a staging point 3.5 m in front of the next gate, pushed further back if the gate would otherwise sit below the camera's look-down cone (the 20° up-tilt means a low gate close by is invisible, which is exactly where an earlier version parked and waited). Hold there until the fix is steady and the nose is aligned with the opening, otherwise back off and re-approach. Creep through at 1.2 m/s, holding heading. Then hover and turn in place toward the next gate at no more than 1 rad/s before flying, because after gates 2 to 4 the next gate lies outside the camera's 74° field of view and a turn while moving produced yaw flicks as the bearing swung through 180°. Gate 6 is approached from its exit side, so it is passed around on two hover points beside it and entered from the correct direction. The speed budget behind those numbers is a back-of-envelope table from the planning week (Table 2).
+
+| gate speed | tightest turn at 20° bank | stop distance | travel in 100 ms of latency | two-lap time |
+|---|---|---|---|---|
+| 1.5 m/s | 0.6 m | 0.4 m | 15 cm | about 4.3 min |
+| 2.5 m/s | 1.8 m | 1.2 m | 25 cm | about 2.9 min |
+| 3.5 m/s | 3.4 m | 2.3 m | 35 cm | about 2.2 min |
+| 5.0 m/s | 7.0 m | 4.8 m | 50 cm | too fast to servo on a gate |
+
+*Table 2. The fallback's speed budget, from the planning week: at each gate speed, the turning radius at the tilt limit, the distance to stop, how far the aircraft travels during the link's latency, and the resulting two-lap time. The deployed settings sit at the slow end because a lost gate is cheaper than a struck one.*
+
+### 7.6 Tested in a pessimistic simulator
+
+To choose between the alternatives the stack was flown in Isaac, but not against Isaac's own truth. A persistent simulator server kept the aircraft dynamics and the course, and a CPU worker per aircraft ran the stack against a deliberately pessimistic sensor model: every gate in view is detected, not just the target; gate-shaped false positives at two per second; whole-gate misses, more when a gate is partly out of frame; corner dropout in sticky runs as measured on the aircraft; pixel noise growing with range; a 30 fps camera delivered with latency and the attitude from capture time; yaw with a start offset and a random walk; and Betaflight's ANGLE loop with a level gain drawn per aircraft, since the real one had not been measured. Plant hover was drawn from 0.30 to 0.36, the band the aircraft had shown. The stack never saw true position, velocity, heading or which gate a detection belonged to.
+
+Sixty-four aircraft flew each configuration from the competition pad. The gains that won were the ones that won in all three worlds tried, not the best in one: 80% reaching three gates in the nominal world, 58% with the course shifted, 100% in a milder world. The hover-and-turn after each gate and the yaw cap took the share reaching three gates from 84% to 95% (four gates, 81% to 92%). The gate 6 detour took gate 6 itself from 0 of 64 to 64 of 64. A flat camera reached three gates in 75% of runs against 36% with the 20° up-tilt, and held a four-minute hover in 64 of 64 aircraft, which is a finding about the camera mount as much as the stack. Figure 24 shows twelve of those runs; Figure 25 is one of them with the stack's own camera view.
+
+![](figures/stack_sim_paths.png)
+
+*Figure 24. The classical fallback stack flown in Isaac against the pessimistic sensor model: twelve attempts from the pad in plan view, true path in blue, the stack's own position estimate dotted, a cross where the run ended. Most crashes fall between gates 5 and 6, where the course reverses.*
+
+![](figures/stack_pov.gif)
+
+*Figure 25. Ten seconds of the classical stack flying in Isaac ([stack_run_02.mp4](https://github.com/bojro/aigp-sim/blob/main/paper/videos/stack_run_02.mp4), 60 s; runs [01](https://github.com/bojro/aigp-sim/blob/main/paper/videos/stack_run_01.mp4) and [03](https://github.com/bojro/aigp-sim/blob/main/paper/videos/stack_run_03.mp4) are the other two attempts). Left: Isaac's chase view. Right: the drone's own camera with the simulated detector's corners drawn, green for the target gate, cyan for other gates, red for false detections, and a status line of time, phase, gates passed, estimation error and time blind.*
+
+### 7.7 On the aircraft
+
+The teammate's onboard program carried the same chain on real frames: over 177 frames at a gate, 410 detections became 377 PnP solutions with a median reprojection error of 2.3 px, 1.2 px with the hand497 model. Its first flight on 21 September hit the ceiling. With the gate out of frame during takeoff, the hover trim integrated the height error and pinned the throttle at its cap; the climb ran at 1.0 m/s where 0.4 m/s was intended. The settings that followed were slower still: 1.0 m/s cruise, a 10° tilt limit, throttle capped at hover plus 0.03, and the three-second no-fix landing. `stack_min` was put on the aircraft that evening through the same hardware pieces, with a launcher that survives a Wi-Fi drop, a hover test mode, and a dry run against the teammate's simulator that flew fifteen seconds of hover and four gates cleanly. There is no record of it flying on the aircraft. Like everything in this section, it was validated in simulation and on the bench and never in the air.
+
+## 8. Flight attempts, and what the aircraft did
 
 No scoresheet for 21–22 September exists in any repository, and the last commit of the event is stamped 01:18 UTC on 22 September. What the record does hold is a bring-up that got close to, but never reached, an autonomous hover, and a fleet that did not survive the attempt. By the team's own account, all four aircraft were grounded by the end.
 
 1. **18 September.** The Betaflight console wedged the flight controller on both of two attempts, each needing a battery pull, and a profile write was lost in the second wedge. Flipping the transmitter switch labelled ACRO/ANGLE "made the drone die"; the mechanism, later confirmed from source, was the override engaging on a zero stick buffer. All of that day's manual attempts were flown in ACRO, because ANGLE had been assigned to no switch, at throttle too low to leave ground effect. The logs show tip-overs and a 3.3 g ground strike, after which the firmware's runaway-takeoff protection disarmed the aircraft. Nobody on the team could hand-hover for more than a second. That evening the airframe was replaced, voiding the day's camera calibration.
 2. **19 September.** The flight controller went silent again, on MSP and to the transmitter, and had to be recovered by hand. The console ban became unconditional. Plan A, the trained policy, was deferred in favour of a slow, self-levelled hover-then-one-gate plan. Motors ran with no radio bound, props off.
 3. **20 September.** A Betaflight reset occurred; the configuration owner wrote a restore procedure and asked that a human run it. The battery was found at 2.55 V per cell. The first props-on policy attempt lasted 0.45 s, twenty policy samples, with the decoded collective climbing from 0.54 to the 0.90 maximum before the pilot disarmed. That evening's rate-map audit (Section 6.4) is titled "Why the first policy flight ended in a wall".
-4. **21 September.** With the configurator and the Jetson attached at once, the flight controller hung. The aircraft came up armed twice, the ARM switch having been left down. The fallback stack's first flight "hit the ceiling": with the gate out of frame its takeoff trim integrated the height error and pinned the throttle at its cap, climbing at 1.0 m/s where 0.4 m/s was intended. The venue asked for extra care. A replacement Jetson appeared that night, its OpenCV missing the GStreamer camera path. Every reinforcement-learning chain was stopped, and the classical stack, which reached 95% three-gate success in the simulator it had been tuned in (Figure 24), was chosen for the final day. There is no record of it flying.
+4. **21 September.** With the configurator and the Jetson attached at once, the flight controller hung. The aircraft came up armed twice, the ARM switch having been left down. The fallback stack's first flight "hit the ceiling": with the gate out of frame its takeoff trim integrated the height error and pinned the throttle at its cap, climbing at 1.0 m/s where 0.4 m/s was intended. The venue asked for extra care. A replacement Jetson appeared that night, its OpenCV missing the GStreamer camera path. Every reinforcement-learning chain was stopped, and the classical stack of Section 7, which reached 95% three-gate success in the simulator it had been tuned in (Figure 24), was chosen for the final day. There is no record of it flying.
 
-![](figures/stack_sim_paths.png)
-
-*Figure 24. The classical fallback stack, flown in Isaac against a pessimistic sensor model (every gate detected, gate-shaped false positives, sticky corner dropout, 60 ms latency, an unknown self-levelling gain). Most crashes fall between gates 5 and 6, where the course reverses.*
-
-![](figures/stack_pov.gif)
-
-*Figure 25. Ten seconds of the classical stack flying in Isaac ([stack_run_02.mp4](https://github.com/bojro/aigp-sim/blob/main/paper/videos/stack_run_02.mp4), 60 s; runs [01](https://github.com/bojro/aigp-sim/blob/main/paper/videos/stack_run_01.mp4) and [03](https://github.com/bojro/aigp-sim/blob/main/paper/videos/stack_run_03.mp4) are the other two attempts). Left: Isaac's chase view. Right: the drone's own camera with the simulated detector's corners drawn, green for the target gate, cyan for other gates, red for false detections, and a status line of time, phase, gates passed, estimation error and time blind.*
 
 What would have had to be true for a scored run? The list is short, and none of it was. A usable height sensor; the aircraft had none. Detector corners available more than 59% of the time, in gaps the policy had trained against; it had only just begun to. A link fast enough for the policies, or policies slow enough for the link; the two met only on the last day. A command path free of a 2.4× rate map, an inverted pitch axis and a yaw sign taken from the wrong message; each was present at some point, the pitch inversion on every runner until 21 September. One enablement sequence instead of three competing in the same week (ACRO with the switch first; ANGLE with arming first; ANGLE in every switch position), each adopted in turn. And a props-off handover check, the one test that proves the abort path works, run after the last change rather than deferred by choice. The team's own closing estimate for passing two gates was 30–40%, with the note that nothing in the onboard racing client had ever touched the aircraft.
 
-## 8. The seam between software and hardware: an engineering retrospective
+## 9. The seam between software and hardware: an engineering retrospective
 
-Section 7 lists what happened. This section asks a narrower question: of the things that went wrong, which ones went wrong *at the boundary* where software written against a simulator met a flight controller, a camera and a radio, and what do they have in common? Four patterns account for nearly all of them.
+Section 8 lists what happened. This section asks a narrower question: of the things that went wrong, which ones went wrong *at the boundary* where software written against a simulator met a flight controller, a camera and a radio, and what do they have in common? Four patterns account for nearly all of them.
 
-### 8.1 Every boundary crossing carried an unchecked assumption
+### 9.1 Every boundary crossing carried an unchecked assumption
 
 A number crosses from the aircraft into the policy, or from the policy out to the motors, and somewhere along the way its meaning changes. Units, sign, scale, rate. Each of those was assumed at least once and each assumption was wrong at least once.
 
@@ -309,7 +365,7 @@ A number crosses from the aircraft into the policy, or from the policy out to th
 
 The common thread is that none of these values was *read off the artefact*. They were read off documents, defaults and memory. Reading the gyro scale took a person rotating the airframe for three seconds; reading the rate profile took one MSP request. Both were done on day five.
 
-### 8.2 Checks that shared a cause with the thing they checked
+### 9.2 Checks that shared a cause with the thing they checked
 
 The team wrote a great many tests. The ones that mattered most, in hindsight, were the few that could have failed on their own.
 
@@ -325,13 +381,13 @@ The team wrote a great many tests. The ones that mattered most, in hindsight, we
 
 The remedy in every row is the same: a second, independent route to the answer. Humans for the labeller, a bench rotation for the gyro, an authoritative `SMOKE_RESULT=` line grepped from stdout instead of a return code, a structural test that parses the source to prove shadow mode cannot transmit. Where the team built those, they held.
 
-### 8.3 The order of operations
+### 9.3 The order of operations
 
 The bring-up ladder was written down early: bench, then props-off handover, then tethered hover, then a gate. It was then climbed out of order. The props-off handover check, which proves that flipping the override switch off returns the aircraft to the pilot, is the abort path, and it was deferred on the last day by choice while four of the things it guards changed the same night. The first props-on policy flight went to an aircraft carrying the 2.4× rate map and an inverted pitch axis; the audit that found both was written after the wall. The plan for the scored day was a single competition run with no bench run before it.
 
 Some of that was time. Some of it was structure. Three people built three runners with three enablement sequences (ACRO with the override switch first, ANGLE with arming first, ANGLE in every switch position), and the shared documents adopted each in turn. Constants that were correct inside one runner were copied into another where they were not. The team's own briefing notes that it "leans heavily on AI coding agents" and that "some decisions live only in chat history"; the on-site working tree and the committed copy drifted, and a rule had to be written to keep them in step. A piece of software that has to be right about a piece of hardware needs one owner for each number, and that ownership was never assigned.
 
-### 8.4 Interlocks that were documented but not enforced
+### 9.4 Interlocks that were documented but not enforced
 
 The dangerous behaviours of the flight controller were all known before they cost anything. They were written in the firmware source and in the team's research notes. What was missing was code that made them impossible.
 
@@ -343,7 +399,7 @@ The dangerous behaviours of the flight controller were all known before they cos
 
 The cheapest fix for all of these is the same shape: a preflight that reads the aircraft's state, refuses to continue if any of the known traps is armed, and prints what it saw. The team wrote one late on 21 September, with a hash of every file that decides what the aircraft would do, so that any change re-opens the handover check. It never flew.
 
-### 8.5 What a second attempt would build first
+### 9.5 What a second attempt would build first
 
 In order, and before any policy is trained:
 
@@ -353,7 +409,7 @@ In order, and before any policy is trained:
 4. One owner per number, one runner, and a change log that lives in the repository rather than a chat.
 5. Only then a simulator decimation set to the measured link rate, and only then training.
 
-## 9. Discussion
+## 10. Discussion
 
 **Measure the plant before you train against it.** The stress study had ranked latency and thrust calibration above every other error source before the team reached the hall. The aircraft then delivered both surprises in exactly that order: a link half as fast as assumed, and a hover throttle never measured in free air. Five minutes with a scale and a stopwatch on day one would have been worth more than any training run.
 
@@ -363,11 +419,11 @@ In order, and before any policy is trained:
 
 **The failure modes that grounded the fleet were not the ones the simulator studied.** Figure 12 contains no wedged flight controller, no zero stick buffer tripping failsafe, no mislabelled transmitter switch, no aircraft arming itself on power-up. Each of those is documented in the firmware source. Each cost an aircraft or a session. Each was preventable by a props-off bench procedure the team wrote and then, under time pressure, skipped.
 
-**Defaults are decisions.** A keypoint threshold of 0.5, a reprojection cap of 2 px, a linear stick map, `np.radians` on raw counts, a mass applied to every link: nobody chose any of them, and all of them were flying. Section 8.1 lists what reading them off the artefact would have cost.
+**Defaults are decisions.** A keypoint threshold of 0.5, a reprojection cap of 2 px, a linear stick map, `np.radians` on raw counts, a mass applied to every link: nobody chose any of them, and all of them were flying. Section 9.1 lists what reading them off the artefact would have cost.
 
 **What we would do next time**, in order. Weigh the aircraft, and measure hover throttle and thrust-to-weight from RPM on day one, in the cage. Measure the link rate with the stream running and set the simulator's decimation to match before renting a GPU. If the rules allow it, put a downward range sensor on the Jetson, because every hover design here died for want of height. Hand-label a hundred real frames before training anything. And never fly a runner whose handover check has not passed since the last change.
 
-## 10. Conclusion
+## 11. Conclusion
 
 In five days on site, after four months of preparation, Team Electric Fire assembled a complete vision-only racing system for an aircraft it had not designed, in a hall without tracking. The simulator, the plant model, the observation contract, the detector and the bench measurements are sound, and they are published. The aircraft never flew autonomously, and when the qualifier ended there was no aircraft left to fly. The learning was not where the gap lay. It lay in the dozen assumptions between the policy's output and the motors, most of them measured only after they had already cost something. They are written down here so that nobody has to measure them again.
 

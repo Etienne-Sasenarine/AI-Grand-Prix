@@ -41,6 +41,18 @@ The simulator is a fork of [Kousheek Chakraborty's `isaac_drone_racer`](https://
 * **Starts that match the race**: on the floor at the competition pad, after two silent spawn bugs were found and fixed.
 * **A smoke test that gates every training run** on a rented box, and bench diagnostics for checkpoints.
 
+## The fallback: a classical perception stack
+
+**Why.** By 19 September the policies flew in the simulator and the team deferred them anyway. They had trained on perfect vision (corners projected from the true gate pose on every frame) while the real detector left the policy's observation intact 59% of the time; the dropout-trained `race40drop` arrived on the last day and never flew. Each of the 1760 inputs had to match to the number, and three mismatches (gyro units, pitch sign, a 2.4× rate map) were found only after a runner had carried them. The policies trained at 60 Hz; the link gives 40. A policy needs ACRO mode, where a fault leaves the aircraft holding its last command with no self-levelling and an abort that means a human hand-flying in rate mode. Nothing around the policy (takeoff, landing, hold) had been validated, and each props-on attempt risked one of four aircraft. The first one lasted 0.45 s.
+
+**What.** A deterministic stack in ANGLE mode: lean-angle commands capped at 15°, about 1 m/s, stop before each gate, height from the gate in view, land on any loss of confidence. Built from the teammate's hardware pieces (a stick stream that never stops, a detector thread, an adapter with the measured axis signs), the `pq/flight` NumPy maths (camera geometry, planar PnP, pose filter, guidance), and a small decision layer, `stack_min`, whose every choice is a parameter.
+
+**How.** Eight corners give a gate pose by planar PnP; the mirrored solution is rejected with gravity from the flight controller's attitude, and the PnP rotation is discarded in favour of that attitude (0.09 m of position error at 8 m under 2 px of noise, against 2.12 m for the full solve). Detections are matched to gates in metres, where the closest two gates are 7.54 m apart. An alpha-beta filter carries position between fixes; hover throttle is learned in flight; blind, the stack can only sink, never climb; three seconds without a fix lands it. Guidance is a state machine: take off, fly to a staging point 3.5 m out, hold until aligned, creep through at 1.2 m/s, hover and turn toward the next gate, detour around gate 6.
+
+![Ten seconds of the classical fallback stack in Isaac: chase view on the left, the drone's own camera with detections on the right](paper/figures/stack_pov.gif)
+
+*The stack in Isaac against a pessimistic sensor model (every gate detected, gate-shaped false positives, sticky corner dropout, latency, an unknown self-levelling gain), chase view beside its own camera. 64 aircraft per configuration: the hover-and-turn after each gate took three-gate success from 84% to 95%; the gate-6 detour took that gate from 0 of 64 to 64 of 64. Section 7 of the paper has the full account, including its one flight, which hit the ceiling.*
+
 ## Documentation
 
 1. [`paper/paper.md`](paper/paper.md): the whole effort in one document, figures and videos included.
@@ -142,10 +154,6 @@ Isaac Sim 4.5, Isaac Lab 2.1.0 and **skrl 1.4.2** (not 2.x; Isaac Lab 2.1 uses t
 * **Nothing here exports to the Jetson.** The NumPy export of a checkpoint and the runner that flies it live in the flight repo under `pq/flight/onboard/`.
 
 ## Recordings
-
-![Ten seconds of the classical fallback stack in Isaac: chase view on the left, the drone's own camera with detections on the right](paper/figures/stack_pov.gif)
-
-*The classical fallback stack under a pessimistic sensor model: chase view beside the drone's own camera with the simulated detector's corners drawn.*
 
 | file | what it shows |
 |---|---|
