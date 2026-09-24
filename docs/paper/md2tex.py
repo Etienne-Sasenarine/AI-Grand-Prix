@@ -98,7 +98,8 @@ while i < n:
         cap = re.sub(r"^Figure \d+\.\s*", "", cap)
         h = "0.60\\textheight" if img.endswith(("course_overlay.png", "race_contact_sheet.jpg", "video_posters.png", "race40drop_first_lap.png", "project_timeline.png", "stress_causes.png", "observation_contract.png")) else "0.42\\textheight"
         stem = os.path.splitext(img)[0]
-        if os.path.exists(os.path.join(HERE, "figures", stem + ".pdf")): img = stem + ".pdf"
+        if img.endswith(".gif"): img = stem + "_still.png"     # the PDF gets one frame; GitHub animates the GIF
+        elif os.path.exists(os.path.join(HERE, "figures", stem + ".pdf")): img = stem + ".pdf"
         tex.append(r"\begin{figure}[htbp]\centering\includegraphics[width=\linewidth,height=" + h + r",keepaspectratio]{" + img + "}")
         tex.append(r"\caption{" + inline(cap) + "}\end{figure}")
         i = j

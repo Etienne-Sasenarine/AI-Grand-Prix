@@ -26,6 +26,7 @@ not LFS):
 
     python3 make_figures.py     # regenerates the charts from the numbers and logs cited in the paper
     python3 make_figures_extra.py   # the system diagram, timeline, label funnel, stress causes, contract layout
+    ~/dev/ai-grand-prix/.venv_mac/bin/python make_gifs.py dump && python3 make_gifs.py assemble   # the animated clips
     python3 md2tex.py && (cd neurips && pdflatex paper.tex && pdflatex paper.tex) && cp neurips/paper.pdf paper.pdf
 
 `make_figures.py` reads the team's recorded numbers (session notes, bench
@@ -57,4 +58,4 @@ live in the captions, not inside the images.
 | `autolabel_funnel.png` | `datasets/autolabel/report.csv` and `datasets/hybrid/report.csv` in the flight repo (2467 candidates, 1917 hybrid labels) |
 | `stress_causes.png` | the 28 stress-scenario JSONs under `analysis/2026-09-16/experiments/results/stress/` |
 | `race40drop_first_lap.png` | the race40drop first-lap figure from the pod session of 21 Sep (36 of 64 aircraft completed the lap); the original file did not survive the pod, this is the team's copy |
-| `stack_pov.gif` | ten seconds of `stack_run_02.mp4` at 8 fps, for inline display on GitHub (OpenCV frames, Pillow GIF) |
+| `race_start_from_pad.gif`, `race_best.gif`, `stack_pov.gif` (+ `_still.png`) | animated clips of the three recordings for inline display on GitHub, and one frame of each for the PDF (`make_gifs.py`: OpenCV frames, Pillow GIF) |
