@@ -1,6 +1,6 @@
 # aigp-sim
 
-**The simulator and policy-training half of our entry to the AI Grand Prix physical qualifier** (Team Electric Fire; Anduril LC3, Santa Ana, 15–22 September 2026). An Isaac Sim / Isaac Lab / skrl PPO stack that trains a policy to fly the organizer's ten-gate hall course from projected gate corners plus IMU, and to hover in front of a gate. The policy emits four numbers, collective thrust and three body rates, which a Jetson Orin NX on the aircraft streams to a Betaflight flight controller over MSP.
+**The simulator and policy-training half of our entry to the AI Grand Prix physical qualifier** (Anduril LC3, Santa Ana, 15–22 September 2026). An Isaac Sim / Isaac Lab / skrl PPO stack that trains a policy to fly the organizer's ten-gate hall course from projected gate corners plus IMU, and to hover in front of a gate. The policy emits four numbers, collective thrust and three body rates, which a Jetson Orin NX on the aircraft streams to a Betaflight flight controller over MSP.
 
 The whole project, across all three repositories, is written up in **[the paper](paper/paper.md)** ([PDF](paper/paper.pdf)), a team write-up in the format of a research paper.
 
@@ -173,4 +173,4 @@ A recording of the current policy (`race40drop`) racing, side by side with its o
 
 ## Lineage and licence
 
-Forked from Kousheek Chakraborty's [`isaac_drone_racer`](https://github.com/kousheekc/isaac_drone_racer) (BSD-3-Clause, `LICENSE`) via our `AI_GP/isaac_drone_racer/`, and split out on 20 September 2026 because a rented GPU box should clone the thing it is going to run, not 1.5 GB of run logs, the flight client and the competition PDFs. We are Team Electric Fire, Cornell University: Geneustace Wicaksono, Bojro Das (College of Arts and Sciences), Etienne Sasenarine, John Apessos, Grant Lin, Narayan Topalli and Aaron Legg (College of Engineering).
+Forked from Kousheek Chakraborty's [`isaac_drone_racer`](https://github.com/kousheekc/isaac_drone_racer) (BSD-3-Clause, `LICENSE`) via our `AI_GP/isaac_drone_racer/`, and split out on 20 September 2026 because a rented GPU box should clone the thing it is going to run, not 1.5 GB of run logs, the flight client and the competition PDFs. We are a Cornell University team: Geneustace Wicaksono, Bojro Das (College of Arts and Sciences), Etienne Sasenarine, John Apessos, Grant Lin, Narayan Topalli and Aaron Legg (College of Engineering).

@@ -77,7 +77,7 @@ tex.append(r"\author{" + r" \AND ".join(r" \And ".join(inline(n) for n in row) f
            + r" \AND \normalfont " + r" \\ ".join(inline(x.strip()) for x in affil.split("·"))
            + r" \\[4pt] " + r" \\ ".join(inline(x.strip()) for x in event.split(", AI Grand Prix", 1)).replace(r" \\ ", r" \\ AI Grand Prix ", 1) + "}")
 # The style file is used for its layout only. Its footer would announce a conference submission; this is a team write-up.
-tex.append(r"\makeatletter\renewcommand{\@noticestring}{Team Electric Fire, Cornell University. A write-up of the AI Grand Prix physical qualifier, September 2026. Not a conference submission.}\makeatother")
+tex.append(r"\makeatletter\renewcommand{\@noticestring}{A Cornell team's write-up of the AI Grand Prix physical qualifier, September 2026. Not a conference submission.}\makeatother")
 tex.append(r"\begin{document}\maketitle")
 tex.append(r"\begin{abstract}" + "\n" + inline(" ".join(abstract)) + "\n" + r"\end{abstract}")
 if front: tex.append(r"\begin{center}\small " + r" \\ ".join(inline(l) for l in front) + r"\end{center}")
