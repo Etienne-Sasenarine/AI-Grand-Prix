@@ -51,5 +51,8 @@ def test_version_follows_obs_version_env(monkeypatch):
 def test_readme_quotes_the_real_v2_hash():
     from pathlib import Path
 
-    readme = (Path(__file__).resolve().parents[1] / "README.md").read_text()
+    # aigp-sim's README moved to docs/campaign/sim/README.md in the consolidated repo.
+    readme = (
+        Path(__file__).resolve().parents[2] / "docs" / "campaign" / "sim" / "README.md"
+    ).read_text()
     assert verify.short_hash("v2") in readme
