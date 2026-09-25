@@ -36,6 +36,10 @@ import numpy as np
 import torch
 from ultralytics import YOLO
 
+# The shipped gate-pose weights live next to this module, under models/.
+# Fetchable via tools/download_models.sh if ever pruned from the tree.
+DEFAULT_WEIGHTS = Path(__file__).resolve().parent / "models" / "best.pt"
+
 KPT_NAMES = ["out_UL", "out_UR", "out_BR", "out_BL", "in_UL", "in_UR", "in_BR", "in_BL"]
 OUTER = slice(0, 4)
 INNER = slice(4, 8)
@@ -108,7 +112,7 @@ class Gate:
 class GateDetector:
     """Thin wrapper around the YOLO pose model that returns Gate objects."""
 
-    def __init__(self, weights: str | Path = "best.pt", imgsz: int = 640, conf: float = 0.4,
+    def __init__(self, weights: str | Path = DEFAULT_WEIGHTS, imgsz: int = 640, conf: float = 0.4,
                  iou: float = 0.5, device: Optional[str] = None, half: bool = False, warmup: bool = True):
         self.model = YOLO(str(weights))
         if self.model.task != "pose":
@@ -244,7 +248,7 @@ def source_fps(source: str) -> float:
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--weights", default="best.pt")
+    ap.add_argument("--weights", default=str(DEFAULT_WEIGHTS))
     ap.add_argument("--source", required=True, help="image, folder, video, or webcam index")
     ap.add_argument("--imgsz", type=int, default=640)
     ap.add_argument("--conf", type=float, default=0.4, help="box confidence threshold")
