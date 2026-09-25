@@ -1,3 +1,15 @@
+# Perception environment — YOLOv8n-pose gate detector (perception/).
+#
+# For real-time inference install a CUDA build of torch FIRST (match the host
+# CUDA), otherwise ultralytics pulls the CPU wheel and inference runs ~10x
+# slower than the 30 fps camera:
+#   pip install torch torchvision --index-url https://download.pytorch.org/whl/cu126
+#   pip install -r perception/requirements.txt
+
 ultralytics>=8.3
 torch>=2.0
 opencv-python
+numpy
+
+# Optional: run the exported *.onnx gate-pose models (perception/models/*.onnx).
+# onnxruntime-gpu     # or plain onnxruntime on CPU-only machines

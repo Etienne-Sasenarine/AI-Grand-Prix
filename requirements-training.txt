@@ -1,0 +1,18 @@
+# Training environment — Isaac Lab / Isaac Sim (the training/ subsystem).
+#
+# PREREQUISITE, installed separately (NOT via pip here):
+#   NVIDIA Isaac Sim 4.5.0 + Isaac Lab, per
+#   https://isaac-sim.github.io/IsaacLab/  — these provide Python, torch,
+#   gymnasium and the omni.* / isaaclab packages. Install training/ into that
+#   interpreter with:  python -m pip install -e training/
+#
+# The packages below are the extras the training code needs on top of a
+# working Isaac Lab install. Run inside the Isaac Lab Python environment:
+#   pip install -r requirements-training.txt
+
+skrl>=1.4.0          # PPO agent + runner used by scripts/rl/train.py
+tensorboard          # training curves under training/logs/
+psutil               # declared by training/setup.py
+pyyaml               # agent configs (tasks/**/agents/skrl_cfg.yaml)
+toml                 # reads extension.toml at build time
+numpy

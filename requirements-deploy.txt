@@ -1,0 +1,25 @@
+# Deploy environment — NVIDIA Jetson Orin NX / JetPack (deploy/ + estimation/).
+#
+# This is the onboard racing client: it reads the camera, runs the VIO
+# (estimation/), evaluates the policy and streams MSP override to the
+# Betaflight FC. The shipped policy is a NumPy .npz (deploy/runtime/models/),
+# so the closed loop needs no deep-learning framework at run time.
+#
+# On JetPack, prefer the system/apt builds of OpenCV and PyGObject (they carry
+# the CUDA/GStreamer bindings the camera path needs); pip wheels usually don't.
+#   pip install -r requirements-deploy.txt
+
+numpy
+pyserial             # MSP link to the Betaflight FC (deploy/target/msp)
+rich                 # live console panels (deploy/target live-view tools)
+
+# Camera capture goes through GStreamer via GObject-Introspection.
+# On JetPack install with apt, not pip:  sudo apt install python3-gi
+PyGObject            # provides `gi`; apt `python3-gi` is preferred on the Orin
+
+# OpenCV: on the Orin use the JetPack/apt build for CUDA + GStreamer.
+# opencv-python       # uncomment only for a non-Jetson bench machine
+
+# Optional: only needed to load .pt policy checkpoints instead of the shipped
+# .npz. Use the JetPack-specific torch wheel from NVIDIA, not the pip default.
+# torch
