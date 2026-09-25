@@ -1,0 +1,279 @@
+	
+	
+AI Grand Prix Physical Qualifier 
+Te c h n i c a l  S p e c i f i c a t i o n   	
+Document ID: VADR-TS-005	
+Issue: 00.02	
+Date: 2026-09-03 
+ 
+  
+
+ 
+AI GRAND PRIX —  
+TECHNICAL SPECIFICATION  
+DOCUMENT ID: VADR-TS-005	ISSUE: 00.02 
+ 
+	
+	
+ 
+Table of Content 
+ 1.	 Document Control 3	
+1.1	Revision History 3	
+1.2	Audience 3	
+2.	 Purpose and Scope 4	
+2.1	Purpose 4	
+2.2	Scope 4	
+2.3	Out of Scope 4	
+3.	 Physical Qualifier 4	
+3.1	Objective 4	
+3.2	Program 4	
+3.3	Qualification rules 5	
+3.4	Track 5	
+3.5	Gates 7	
+3.6	Drone 7	
+3.7	Compute Unit 8	
+3.8	Sensors 8	
+4.	 FAQ 9	
+	 	
+ 
+AI GRAND PRIX —  
+TECHNICAL SPECIFICATION  
+DOCUMENT ID: VADR-TS-005	ISSUE: 00.02 
+ 
+	
+	
+ 
+1. Document Control 	
+1.1 Revision History 
+	
+Issue Date Author Summary of Changes 
+00.01 2026-08-18 NT	 First release 
+00.02 2026-08-03 NT	 First release 
+    
+ 
+ 
+1.2 Audience 
+	
+This specification is addressed to competition participants (“Teams”). It defines the technical interface and 
+operational requirements required to develop autonomous control software for the physical qualifier AI Drone 
+Race. 
+	  
+ 
+AI GRAND PRIX —  
+TECHNICAL SPECIFICATION  
+DOCUMENT ID: VADR-TS-005	ISSUE: 00.02 
+ 
+	
+	
+2. Purpose and Scope 	
+2.1 Purpose 
+	
+This document provides contestants with essential information regarding the physical qualifier event, the 
+racing environment, and the provided drone and compute hardware. Additionally, it details the software stack 
+specifications. 
+ 
+2.2 Scope 
+	
+• Rules 
+• On site program 
+• Specs of the software stack  
+• Track environment definition 
+• qualification run requirements 
+ 
+2.3 Out of Scope 
+	
+• internal simulator architecture 
+• event operations 
+• contractual or commercial matters 
+3. Physical Qualifier 	
+3.1 Objective 
+	
+Validate autonomous drone flight capabilities through a timed obstacle course, qualifying teams based on 
+navigation precision, gate passage count, and lap performance. 
+3.2 Program  
+	
+On site teams will have dedicated slots every day to train the software performance in the real track	
+	
+Time Slots: Multiple defined operational slots per team per day. 
+Timing Activation: Runs are classified and timed starting from the first timing line cross / gate trigger. 
+	
+	
+	
+	
+	
+	
+	
+ 
+AI GRAND PRIX —  
+TECHNICAL SPECIFICATION  
+DOCUMENT ID: VADR-TS-005	ISSUE: 00.02 
+ 
+	
+	
+3.3 Qualification rules 
+	
+Ranking Criteria: Leaderboard ranking is strictly determined based on the timing results of valid, completed 
+runs.  
+In order a run being valid the drone must fly without any intervention of human pilots 
+Run Requirements:  
+• In order to complete a run, the teams must complete 2 laps of the track. 
+ 
+Qualfications requirement: 
+• Qualification & Scoring 
+Evaluated by the best overall time recorded during the final two days 
+• Primary Scoring:  
+Ranked by the maximum number of successfully passed gates. 
+• Tie-Breaker:  
+Fastest elapsed time to the last validly crossed gate. 
+3.4 Track  
+• Footprint: 60m x 21m  
+• The track consists of multiple gate gates including a double gate 
+	
+	
+	
+
+ 
+AI GRAND PRIX —  
+TECHNICAL SPECIFICATION  
+DOCUMENT ID: VADR-TS-005	ISSUE: 00.02 
+ 
+	
+	
+	
+
+ 
+AI GRAND PRIX —  
+TECHNICAL SPECIFICATION  
+DOCUMENT ID: VADR-TS-005	ISSUE: 00.02 
+ 
+	
+	
+3.5 Gates 
+	
+Gate boundaries 
+• Width: 2700mm 
+• Height: 2700mm 
+• Depth:  80mm 
+	
+	
+	
+	
+Gate inner square boundaries: 
+ 
+• Width: 1500mm 
+• Height: 1500mm 
+• Depth:  80mm 
+	
+3.6 Drone 
+	
+• Platform: Archer B2 Frame  
+• Flight Controller (FC): Running Betaflight firmware. 
+• Inter-Board Protocol: Serial UART protocol for high-speed telemetry and command communication with 
+the AI compute module. 
+• The drone uses 8-inch propellers with a 4.1 pitch. Full details on motors, ESCs, battery specs, IMU 
+hardware, and total all-up weight (AUW). More details can be provided on site. 
+	  
+
+ 
+AI GRAND PRIX —  
+TECHNICAL SPECIFICATION  
+DOCUMENT ID: VADR-TS-005	ISSUE: 00.02 
+ 
+	
+	
+3.7 Compute Unit 
+Hardware: 
+• System-on-Module: NVIDIA Jetson Orin NX (16 GB) 
+• Carrier / Breakout Board: Seeed Studio A603 Carrier Board 
+ 
+Software Stack: 
+• Base SDK: NVIDIA JetPack 6.2 
+• Provided Software: Demo applications for camera sensor bring-up and FC-to-AI board serial 
+communication.	
+3.8 Sensors 
+• The camera uses a rolling shutter sensor running at $1920 \times 1080$ resolution at 60 FPS (Mode , 
+with a Horizontal Field of View (HFOV) of 75°.  
+• Vision System: Arducam 12.3 MP HQ Camera Module with M12 Lens Mount  
+• IMU is calibrated by Betaflight upon power on and provides IMU data at 50 Hz. 
+	
+	
+	 	
+ 
+AI GRAND PRIX —  
+TECHNICAL SPECIFICATION  
+DOCUMENT ID: VADR-TS-005	ISSUE: 00.02 
+ 
+	
+	
+4. FAQ  
+• What is our access level to Betaflight? 
+You can configure rates, PIDs, filters, and telemetry via the Betaflight CLI. However, full reflashing of 
+the flight controller is not allowed. 
+ 
+• How do the Flight Controller (FC) and Nvidia Jetson communicate? 
+They connect via UART using MSP. The interface transmits RC control signals (TX) and streams  
+ 
+• What are the Jetson system specs, power modes, and privileges? 
+You have full root access on the Jetson Orin NX. The Jetson operates in a 25W power mode, and a 
+dedicated power supply will be provided in your workshop area. 
+ 
+• How are camera frames timestamped? 
+Frames are timestamped directly on the Jetson Orin NX using CLOCK_MONOTONIC. 
+ 
+• Can we control camera settings and get intrinsic/extrinsic calibrations? 
+You can control exposure and gain. Formal camera calibration matrices (intrinsics/extrinsics) will not be 
+provided, but the physical position and orientation of the IMU relative to the drone will be supplied. 
+ 
+• Will you provide goggles and a controller for flying the drone? 
+A ground station and RC controller will be provided for each team when needed.   
+ 
+• Can we adjust camera tilt during flight? 
+Yes, pitch adjustments can be made during flight. 
+ 
+• Are the control APIs in VQ2 based on the actual drone, or is there an additional transition layer? 
+The APIs will differ from the physical drone setup. Full details on transition calls and timing will be 
+provided in future documentation. 
+ 
+• Can we issue an emergency shutdown? 
+You have a manual override function via the RC controller that immediately supersedes autonomous 
+functions at any time. 
+ 
+• Can camera footage be transmitted mid-flight? 
+Yes, the drone includes an onboard video transmitter (VTX). 
+ 
+• Will teams receive training upon arrival? 
+Yes, setup instructions and hands-on support for drone arming will be provided. Spectator access and 
+future qualifier schedules will be communicated at a later date. 
+ 
+ 
+AI GRAND PRIX —  
+TECHNICAL SPECIFICATION  
+DOCUMENT ID: VADR-TS-005	ISSUE: 00.02 
+ 
+	
+	
+• What actions result in disqualification? 
+Any non-compliance or action outside the official rulebook results in immediate disqualification. 
+ 
+• Can we stand near the flight path with PPE? 
+No, standing near the flight path is strictly prohibited regardless of PPE. 
+ 
+• What happens if a drone gets damaged during flight? 
+Teams are not financially liable for drone damage. All repairs, maintenance, and battery charging are 
+managed on-site by the Neros repair team. Teams may not use personal battery chargers. 
+ 
+• Will a course map or external tracking systems (like motion capture) be available? 
+No external motion trackers or true-state tracking systems exist inside the building. Course map 
+distribution details will be announced later. 
+ 
+• How much flight time does each team get? 
+Teams receive dedicated slots per day per team, alongside dedicated time in the training cage. Manual 
+piloting is permitted. 
+ 
+• Do teams share drones or data? 
+No, data is not shared among teams. Each team is assigned a fleet of 4 dedicated drones. 
+ 
+ 
+ 
+ 
+ 

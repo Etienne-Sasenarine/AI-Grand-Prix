@@ -1,0 +1,67 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# Virtualenv
+venv/
+.venv/
+.venv_mac/
+winvenv/
+# Local practice checkpoints (regenerated as you fly).
+practice/
+
+# Ignore run logs, but keep the published personal-best package
+# and the folder rules for anyone cloning the repo.
+logs/*
+!logs/README.md
+!logs/best/
+!logs/best/**
+logs/best/telem_best.csv
+logs/best/attitude_fast.json
+
+# Trained weights (large / regenerable)
+*.pt
+*.ckpt
+# Keep the Isaac PPO keepers and their training logs in-tree.
+!isaac_drone_racer/models/
+!isaac_drone_racer/models/**
+!isaac_drone_racer/**/*.pt
+!isaac_drone_racer/**/*.ckpt
+!isaac_drone_racer/logs/
+!isaac_drone_racer/logs/**
+!isaac_drone_racer/datasets/
+!isaac_drone_racer/datasets/**
+
+# Simulator install (large binary, not source)
+AIGP_3385/
+
+# Vision debug/capture output (regenerable)
+_vision_debug/
+frames/
+datasets/
+logs/*.csv
+logs/*.txt
+
+# Training artifacts (Dreamer / BC checkpoints — large, regenerable)
+artifacts/
+
+# YOLO / policy training output (checkpoints + plots, hundreds of MB, and
+# fully regenerable from datasets/ via tools/train_gate_pose.py)
+runs/
+
+# OS
+.DS_Store
+# Windows reserved device name — accidental `> nul` redirects create this file
+# and `git add` then fails with "unable to index file 'nul'".
+nul
+NUL
+
+# inference/: keep the shipped gate-pose weights, ignore the local Roboflow
+# dataset the notebook trained on (frames/ is ~75 MB of JPGs + COCO json).
+inference/frames/
+!inference/best.pt
+
+# Dataset downloads (e.g. the Roboflow export): hundreds of MB, never for git
+*.zip

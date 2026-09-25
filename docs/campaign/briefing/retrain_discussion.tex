@@ -1,0 +1,18 @@
+\begin{verdict}[What the retraining test shows]
+\begin{itemize}
+\item \textbf{Gene's model does not survive the corrections.} On the corrected simulator (official course and real camera), it gets through only 0.1--0.9 gates per attempt: 51 to 303 crashes per 100 gates. In a clean playback run starting at official gate~1, it passes 4 gates and crashes, every time. With the real camera and course, expect it to crash within the first few gates.
+\item \textbf{One hour of further training helps a lot, but only under the conditions it trained on.} With the expected disturbances:
+\begin{itemize}
+\item the retrained model gets through 6.3 gates per attempt, with 11 crashes per 100 gates. Gene's model gets 0.3 and 110, so this is about 10$\times$ better;
+\item when it completes a lap, the lap takes about 11\,s, slower than Gene's 7.4\,s laps in his original simulator.
+\end{itemize}
+\item \textbf{It is not yet reliable, and it only works in a narrow range.}
+\begin{itemize}
+\item Only 6--7\,\% of runs would complete two laps.
+\item It does worse with \emph{no} disturbances at all, because it learned to expect delay and drag.
+\item It still fails under rougher disturbances.
+\item A clean playback run crashes after 2 gates.
+\end{itemize}
+\item \textbf{Conclusion:} training on the corrected simulator is the right direction, but it needs several hours rather than one. It also needs the disturbances varied over wide ranges (camera tilt, delay, drag, detection noise), so that it copes with both calm and rough conditions, and every candidate must be checked with these tests before flying. Until a retrained model passes the Sunday go/no-go check on the real drone, Plan~B is the plan for scoring.
+\end{itemize}
+\end{verdict}

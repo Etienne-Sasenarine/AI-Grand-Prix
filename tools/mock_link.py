@@ -1,0 +1,431 @@
+"""A stand-in for the organizers' ``MSPLink``, so the field tools can be built
+and validated with no drone, no flight controller and no ``~/target/``.
+
+Why this exists rather than a copy of their ``fake_fc.py``
+---------------------------------------------------------
+Their ``fake_fc.py`` simulates a Betaflight FC **on a pty**, at the wire level,
+and it is the right thing to test against once ``~/target/`` is in hand. We do
+not have it yet, and the one mirror we can see sits inside a repository with no
+licence, so it is off limits.
+
+This is deliberately *not* a second MSP implementation — the software guide says
+"do not re-implement MSP framing", and nothing here frames a byte. It duck-types
+the ``MSPLink`` **interface** documented in the Orin NX software guide, and
+backs it with a small flight model.
+
+That backing model is the point. It flies with **known** parameters, so an
+analysis tool can be checked against a ground truth it was never told:
+``analyze_hover`` must recover ``hover_throttle`` and ``analyze_rates`` must
+recover ``tau_s`` and ``max_ang_accel`` from nothing but the log. A parser that
+merely runs without crashing is not evidence of anything.
+
+Swap it for the real thing with ``--dev /dev/ttyTHS1``; the tools take either.
+"""
+
+from __future__ import annotations
+
+import math
+import random
+import time
+from dataclasses import dataclass, field
+
+G = 9.80665
+
+
+@dataclass
+class MockConfig:
+    """Ground truth. The analysis tools must recover these without being told."""
+
+    #: Throttle that holds a hover, as a fraction of the 1000-2000 RC range.
+    #: The whole point of the hover experiment is to find this number.
+    hover_throttle: float = 0.31
+    #: Closed-loop body-rate time constant, seconds. What a rate step measures.
+    tau_s: float = 0.045
+    #: Angular-acceleration ceiling, rad/s^2, per axis. The saturation point.
+    max_ang_accel: tuple = (95.0, 85.0, 38.0)
+    #: Rate at full stick deflection, rad/s.
+    rate_limit: float = 3.2
+    #: Pack voltage full and empty, and how far the throttle drifts across it.
+    volt_full: float = 25.2
+    volt_empty: float = 21.0
+    pack_duration_s: float = 240.0
+    #: Steady attitude offset at hover, radians. Centre-of-gravity and thrust
+    #: axis misalignment show up here, and it adds to the camera tilt.
+    trim_roll: float = math.radians(0.8)
+    trim_pitch: float = math.radians(-2.1)
+    #: Gyro noise, rad/s, and attitude noise, radians.
+    gyro_noise: float = 0.02
+    att_noise: float = math.radians(0.15)
+    #: Motor command noise, in the 0-1 fraction.
+    motor_noise: float = 0.004
+    #: Raw gyro scaling. Betaflight reports raw counts; the conflict in SPEC.md
+    #: is whether this is 16.4 counts/deg/s or already deg/s. The mock uses the
+    #: counts convention so the units check has something to catch.
+    gyro_counts_per_deg_s: float = 16.4
+    acc_counts_per_g: float = 512.0
+    seed: int = 0
+
+
+class MockLink:
+    """Duck-types ``msp.MSPLink``. See the module docstring."""
+
+    def __init__(self, cfg: MockConfig | None = None) -> None:
+        self.cfg = cfg or MockConfig()
+        self._rng = random.Random(self.cfg.seed)
+        self._t0 = time.monotonic()
+        self._last = self._t0
+        self._rates = [0.0, 0.0, 0.0]          # rad/s, body
+        self._att = [self.cfg.trim_roll, self.cfg.trim_pitch, 0.0]
+        self._throttle = 0.0                   # 0-1
+        self._rate_cmd = [0.0, 0.0, 0.0]
+        self._crc_errors = 0
+        self._armed = False
+        self.closed = False
+        #: How many times anything asked this link to actuate the aircraft.
+        #: Tools that claim to be read-only can then be *checked* rather than
+        #: trusted -- see test_camera_capture.py, which runs beside a pilot with
+        #: propellers on and must never command anything.
+        self.commands_received = 0
+        #: Mode ranges as (permanentId, auxChannelIndex, startStep, endStep),
+        #: seeded with what the real airframe actually carries (read off
+        #: dcl-orin on 18 Sep): ARM on aux0, four others, and ANGLE assigned to
+        #: nothing. A tool that fixes ANGLE has to work against this shape.
+        #: Steps are (microseconds - 900) / 25.
+        self.mode_ranges = [(0, 0, 28, 48), (40, 6, 6, 48), (41, 2, 28, 48),
+                            (43, 5, 28, 48), (50, 4, 32, 48)] + [(0, 0, 0, 0)] * 15
+        self.eeprom_writes = 0
+        #: Motor poles, for the RPM telemetry reply.
+        self.motor_poles = 14
+        #: Aux channel overrides, {1-based RC channel: microseconds}. Lets a
+        #: test drive the marker switch the pilot would flip.
+        self.aux: dict = {}
+        #: PID profiles, shaped like the real airframe (full dump, 18 Sep): six
+        #: of them, **profile 2 active -- the 8-inch tune**; 0 is the vendor's
+        #: 10-inch tune and 1 the 5-inch one. ``level_limit`` (the ANGLE-mode
+        #: tilt limit, degrees) is 30 / 23 / 55 across the first three, which is
+        #: what lets ``setup_angle_mode.py`` find that byte without trusting
+        #: anybody's memory of the payload layout.
+        self.pid_profile = 2
+        #: Where the tilt-limit byte sits in the MSP_PID_ADVANCED reply. A test
+        #: can move it, to prove the tool finds it rather than assuming it.
+        self.level_limit_offset = 17
+        self._pid_advanced = None       # built lazily so a test can move the offset first
+        #: Fault switch: a write that also disturbs a byte it was not asked to.
+        self.pid_advanced_corrupts = False
+        self.profile_selects = 0
+
+    # ------------------------------------------------------------- driving it
+    def command(self, throttle: float, rates_rad_s=(0.0, 0.0, 0.0)) -> None:
+        """What a transmitter would be sending. Not part of the MSPLink API."""
+        self.commands_received += 1
+        self._throttle = float(min(max(throttle, 0.0), 1.0))
+        self._rate_cmd = [float(r) for r in rates_rad_s]
+
+    def _advance(self) -> None:
+        now = time.monotonic()
+        dt = now - self._last
+        if dt <= 0:
+            return
+        self._last = now
+        dt = min(dt, 0.1)
+        c = self.cfg
+        for i in range(3):
+            err = self._rate_cmd[i] - self._rates[i]
+            accel = err / max(c.tau_s, 1e-4)
+            lim = c.max_ang_accel[i]
+            accel = max(-lim, min(lim, accel))
+            self._rates[i] += accel * dt
+            self._att[i] += self._rates[i] * dt
+        # Attitude relaxes toward trim in roll/pitch, as ANGLE mode would.
+        self._att[0] += (c.trim_roll - self._att[0]) * min(1.0, dt * 3.0)
+        self._att[1] += (c.trim_pitch - self._att[1]) * min(1.0, dt * 3.0)
+
+    # ------------------------------------------------------- the MSPLink face
+    @property
+    def elapsed(self) -> float:
+        return time.monotonic() - self._t0
+
+    def _sag(self) -> float:
+        frac = min(1.0, self.elapsed / max(self.cfg.pack_duration_s, 1e-6))
+        return self.cfg.volt_full + (self.cfg.volt_empty - self.cfg.volt_full) * frac
+
+    def attitude(self):
+        """(roll, pitch, yaw) in degrees, yaw 0-360 — as documented."""
+        self._advance()
+        n = self.cfg.att_noise
+        r, p, y = (a + self._rng.gauss(0.0, n) for a in self._att)
+        return (math.degrees(r), math.degrees(p), math.degrees(y) % 360.0)
+
+    def raw_imu(self):
+        """(acc, gyro, mag), each a 3-tuple, in **raw FC units**."""
+        self._advance()
+        c = self.cfg
+        gyro = tuple(int(round((math.degrees(w) + self._rng.gauss(0.0, math.degrees(c.gyro_noise)))
+                               * c.gyro_counts_per_deg_s)) for w in self._rates)
+        # Thrust along body up, plus gravity, in g. A hovering drone reads 1 g.
+        az = (self._throttle / max(c.hover_throttle, 1e-6))
+        acc = (int(round(-math.sin(self._att[1]) * az * c.acc_counts_per_g)),
+               int(round(math.sin(self._att[0]) * az * c.acc_counts_per_g)),
+               int(round(az * c.acc_counts_per_g)))
+        return acc, gyro, (0, 0, 0)
+
+    def analog(self):
+        v = self._sag()
+        return {"voltage_v": round(v + self._rng.gauss(0.0, 0.02), 3),
+                "current_a": round(18.0 + 40.0 * self._throttle, 2),
+                "mah_drawn": int(1400 * min(1.0, self.elapsed / 240.0)),
+                "rssi": 1000}
+
+    def rc_channels(self):
+        """The channels the FC is acting on, in 1000-2000 microseconds.
+
+        Sixteen of them, like the real link, so a tool that searches the aux
+        channels for a marker switch has somewhere to search.
+        """
+        def us(x):
+            return int(1000 + 1000 * min(max(x, 0.0), 1.0))
+        mid = [500 + 500 * (r / max(self.cfg.rate_limit, 1e-6)) for r in self._rate_cmd]
+        ch = [us(self._throttle)] + [int(1000 + m) for m in mid] + [1500] * 12
+        ch[4] = 1800 if self._armed else 1000        # ch5: the arming switch
+        for k, v in self.aux.items():
+            if 1 <= k <= 16:
+                ch[k - 1] = int(v)
+        return ch[:16]
+
+    def motors(self):
+        """Per-motor output, 1000-2000. Sags with the pack, as a real one does.
+
+        This is the channel the hover experiment reads, **not** the throttle
+        stick: it is post-mix, post-curve and post-TPA, which is what the ESCs
+        actually saw.
+        """
+        self._advance()
+        c = self.cfg
+        sag_comp = c.volt_full / max(self._sag(), 1e-6)
+        base = self._throttle * sag_comp
+        out = []
+        for _ in range(4):
+            v = base + self._rng.gauss(0.0, c.motor_noise)
+            out.append(int(1000 + 1000 * min(max(v, 0.0), 1.0)))
+        return out + [0, 0, 0, 0]
+
+    def altitude(self):
+        """(altitude_m, vario_m_s) -- a TUPLE, matching the real library.
+
+        The mock reports a **dead barometer**, because that is what the real one
+        does on this airframe: measured on 18 Sep, ``vario`` held exactly 0.000
+        for all 2828 samples of a two-minute flight, and altitude fell to
+        -6.5 m as the props spun up. Any stability gate built on vario passes
+        on every frame and filters nothing -- which is how a log of the drone
+        sitting on the ground was accepted as a hover.
+        """
+        return (0.0, 0.0)
+
+    #: What MSP_BOXIDS returns on the real airframe (read 18 Sep). The position of
+    #: an id in this list is its bit in ``flight_mode_flags``.
+    BOX_IDS = [0, 1, 2, 6, 27, 46, 7, 8, 13, 19, 20, 26, 30, 31, 32,
+               33, 34, 35, 36, 37, 39, 45, 40, 41, 43, 48, 49, 50, 51, 52, 53]
+
+    def box_ids(self):
+        return list(self.BOX_IDS)
+
+    def _mode_active(self, permanent_id: int) -> bool:
+        """Is any range for this mode switched on by the current channel values?"""
+        rc = self.rc_channels()
+        for pid, aux, a, b in self.mode_ranges:
+            if pid != permanent_id or a >= b:
+                continue
+            v = rc[4 + aux] if 4 + aux < len(rc) else 1500
+            if 900 + 25 * a <= v < 900 + 25 * b:
+                return True
+        return False
+
+    def status(self):
+        # ARM follows the test hook; ANGLE follows the mode ranges and the
+        # switches, the way the real flight controller reports it.
+        flags = 0
+        if self._armed:
+            flags |= 1 << self.BOX_IDS.index(0)
+        if self._mode_active(1):
+            flags |= 1 << self.BOX_IDS.index(1)
+        return {"cycle_time_us": 125, "i2c_errors": 0, "flight_mode_flags": flags,
+                "arming_flags": 0, "armed": self._armed,
+                "pid_profile": self.pid_profile}
+
+    def _pid_advanced_payloads(self) -> list:
+        """One MSP_PID_ADVANCED reply per PID profile.
+
+        Deliberately awkward, because the real one is: most bytes are identical
+        across profiles, a few differ for reasons that have nothing to do with
+        the tilt limit, one constant byte happens to equal 55, and one offset
+        carries 30 / 23 in the first two profiles and then an implausible 200 --
+        a decoy that matches the anchors and must be thrown out on range.
+        """
+        if self._pid_advanced is None:
+            limits = [30, 23, 55, 55, 55, 55]
+            other = [12, 40, 25, 25, 31, 31]          # differs per profile, not the limit
+            decoy = [30, 23, 200, 7, 7, 7]
+            out = []
+            for prof in range(6):
+                b = bytearray((7 * i + 3) % 251 for i in range(47))
+                b[5] = 55                              # constant 55: not the limit
+                b[8] = other[prof]
+                b[30] = decoy[prof]
+                b[self.level_limit_offset] = limits[prof]
+                out.append(b)
+            self._pid_advanced = out
+        return self._pid_advanced
+
+    def fc_version(self):
+        return "4.4.3"
+
+    def board_id(self):
+        return "SH74"
+
+    def arm_state(self, armed: bool) -> None:
+        """Test hook. Nothing here ever commands the aircraft."""
+        self._armed = bool(armed)
+
+    def api_version(self):
+        return (1, 46, 0)
+
+    def fc_variant(self):
+        return "BTFL"
+
+    def uid(self):
+        return "MOCK-0000-0000"
+
+    def crc_errors(self):
+        return self._crc_errors
+
+    def decode_arming_flags(self, *_a, **_k):
+        return []
+
+    def decode_sensor_flags(self, *_a, **_k):
+        return ["ACC", "BARO", "GYRO"]
+
+    def request(self, cmd, payload=b"", timeout=None, retries=2):
+        """The generic MSP call. Only the commands our tools actually use."""
+        import struct as _s
+        if cmd == 34:                                   # MSP_MODE_RANGES
+            out = bytearray()
+            for pid, aux, a, b in self.mode_ranges:
+                out += bytes([pid, aux, a, b])
+            return bytes(out)
+        if cmd == 35:                                   # MSP_SET_MODE_RANGE
+            if len(payload) < 5:
+                raise ValueError("MSP_SET_MODE_RANGE needs 5 bytes")
+            idx, pid, aux, a, b = payload[0], payload[1], payload[2], payload[3], payload[4]
+            if idx >= len(self.mode_ranges):
+                raise IndexError("mode range index out of bounds")
+            self.mode_ranges[idx] = (pid, aux, a, b)
+            return b""
+        if cmd == 250:                                  # MSP_EEPROM_WRITE
+            self.eeprom_writes += 1
+            return b""
+        if cmd == 94:                                   # MSP_PID_ADVANCED
+            return bytes(self._pid_advanced_payloads()[self.pid_profile])
+        if cmd == 95:                                   # MSP_SET_PID_ADVANCED
+            cur = self._pid_advanced_payloads()[self.pid_profile]
+            if len(payload) != len(cur):
+                raise ValueError("MSP_SET_PID_ADVANCED: wrong payload length")
+            cur[:] = payload
+            if self.pid_advanced_corrupts:
+                cur[2] ^= 0xFF
+            return b""
+        if cmd == 210:                                  # MSP_SELECT_SETTING
+            if self._armed or len(payload) < 1:
+                return b""                              # the real one ignores it when armed
+            if not payload[0] & 0x80 and payload[0] < 6:   # 0x80 = rate profile, not ours
+                self.pid_profile = payload[0]
+                self.profile_selects += 1
+            return b""
+        if cmd == 119:                                  # MSP_BOXIDS
+            return bytes(self.BOX_IDS)
+        if cmd == 139:                                  # MSP_MOTOR_TELEMETRY
+            # RPM follows the motor output, quadratically-ish in the real world;
+            # here linear is enough to exercise the parsing and the plumbing.
+            # Thrust in this model is LINEAR in throttle, and a propeller's
+            # thrust goes as RPM squared -- so RPM must go as the square root of
+            # throttle for the two to be consistent. Getting this right is what
+            # makes (rpm_full / rpm_hover)^2 come out at 1 / hover_throttle,
+            # which is a real check of the analysis rather than a tautology.
+            out = bytearray([4])
+            for m in self.motors()[:4]:
+                frac = max(0.0, (m - 1000) / 1000.0)
+                rpm = int(9600 * math.sqrt(frac))
+                out += _s.pack("<I", int(rpm * (self.motor_poles / 2) / 100)) + b"\x00\x00"
+            return bytes(out)
+        raise NotImplementedError(f"mock does not implement MSP command {cmd}")
+
+    def close(self):
+        self.closed = True
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        self.close()
+        return False
+
+
+def open_link(dev: str | None, *, baud: int = 115200, cfg: MockConfig | None = None):
+    """Return a real ``MSPLink`` when a device is named, otherwise the mock.
+
+    Every tool in this directory takes ``--dev``; leaving it off runs against
+    the mock, so the whole set is testable on a laptop.
+    """
+    if dev in (None, "", "mock"):
+        return MockLink(cfg)
+    import sys
+    for p in ("/home/dcl/target/msp", "./target/msp", "../target/msp",
+              "../../target/msp"):
+        if p not in sys.path:
+            sys.path.insert(0, p)
+    from msp import MSPLink  # noqa: E402  — only on the drone
+    link = MSPLink(dev, baud)
+    # MSPLink's constructor does NOT open the port: it leaves ``_ser`` as None
+    # and every accessor then dies with "'NoneType' object has no attribute
+    # 'write'". ``open()`` is what creates the serial port and starts the
+    # background receive thread, and it returns self.
+    #
+    # This cost us a real debugging session on 18 Sep: the whole tool suite
+    # passed against MockLink, which needs no opening, and then failed at first
+    # contact with the flight controller. The mock hid it, so the mock is not
+    # enough on its own.
+    link.open()
+    return link
+
+
+def _self_test() -> None:
+    cfg = MockConfig()
+    fc = MockLink(cfg)
+    assert fc.fc_variant() == "BTFL"
+    r, p, y = fc.attitude()
+    assert -10 < r < 10 and -10 < p < 10 and 0 <= y < 360, (r, p, y)
+
+    fc.command(cfg.hover_throttle)
+    time.sleep(0.05)
+    m = fc.motors()
+    assert len(m) == 8 and all(1000 <= v <= 2000 for v in m[:4]), m
+    frac = (sum(m[:4]) / 4 - 1000) / 1000.0
+    assert abs(frac - cfg.hover_throttle) < 0.02, (frac, cfg.hover_throttle)
+
+    acc, gyro, _ = fc.raw_imu()
+    assert abs(acc[2] / cfg.acc_counts_per_g - 1.0) < 0.1, acc
+
+    fc.command(cfg.hover_throttle, (2.0, 0.0, 0.0))
+    for _ in range(40):
+        time.sleep(0.01)
+        fc.attitude()
+    _, gyro, _ = fc.raw_imu()
+    roll_rate = gyro[0] / cfg.gyro_counts_per_deg_s
+    assert roll_rate > 60.0, f"rate command should spin the roll axis up, got {roll_rate:.1f} deg/s"
+
+    print("mock_link: all checks passed")
+    print(f"  hover recovered from motors(): {frac:.3f} against a true {cfg.hover_throttle:.3f}")
+    print(f"  roll rate after a 2.0 rad/s step: {roll_rate:.0f} deg/s")
+
+
+if __name__ == "__main__":
+    _self_test()

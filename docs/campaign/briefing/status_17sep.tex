@@ -1,0 +1,162 @@
+%========================================================== STATUS 17 SEPTEMBER
+\section*{Status at 17 September --- read this before anything else}
+\addcontentsline{toc}{section}{Status at 17 September --- read this before anything else}
+
+Revision~1 of this document was written on the evening of 16 September, off site, before anyone had
+touched the drone. The team is now at LC3, the race drone has been weighed, and the physical-qualifier
+specification (VADR-TS-005, issue 00.02) has been re-read line by line. Some of what follows in
+Parts~I and~II has been overtaken. \textbf{Where this section disagrees with a later section, this
+section is right.}
+
+\subsection*{What changed}
+
+\begin{table}[H]\centering\footnotesize
+\begin{tabularx}{\linewidth}{@{}p{3.0cm}XX@{}}
+\toprule
+Item & Revision~1 said & Now \\
+\midrule
+Gene's model & The main line for Plan~A & \textbf{Abandoned.} It does not survive on the corrected simulator. Gene has reviewed the findings and agrees. The objective is now to train a new policy on the corrected simulator \\
+Drone mass & \SI{0.6076}{kg} (the simulated value) & \textbf{\SI{1745}{g}} measured, race configuration. See the box below for why this matters less, and differently, than it looks \\
+Camera & fx\,$\approx$\,424\,px (\SI{74.1}{\degree}), from another team's calibration & \textbf{fx\,=\,fy\,=\,417.0\,px} (\SI{75}{\degree}), from our own specification. Ours must still be calibrated --- the spec says no calibration matrices will be provided \\
+Deployment layer & ``Also still to be built'' & Still the critical path, but \textbf{much smaller than feared}: the organizers ship a complete, working MSP layer on the drone (\code{~/target/msp/}), including a fake flight controller for offline development. Ours is the adapter, not the protocol \\
+Link speed & Assumed our 60\,Hz policy rate was achievable & The organizers state twice that the link gives ``attitude at 30--50\,Hz; a hard real-time control loop is not'' realistic. \textbf{May force a retrain at a lower policy rate} \\
+Camera mode & Assumed 1920$\times$1080 at 60\,fps & The carrier wires only \textbf{two of four} camera data lanes. That mode may not exist --- and the \SI{75}{\degree} figure is quoted \emph{for} it \\
+``Next gate'' input & Not called out & \textbf{No source exists on the real drone.} The simulator supplied it \\
+Safety pilot & Assumed possibly available during a run & \textbf{A valid run allows no human pilot intervention at all} (spec \S3.3). The override switch aborts a run; it cannot rescue one \\
+Track footprint & $25.9\times\SI{50.25}{m}$ from the drawing's ruler & \textbf{Resolved.} The official gate-coordinate reference gives $85\times165$\,ft $=25.91\times\SI{50.29}{m}$, confirming the drawing. The spec's ``$60\times\SI{21}{m}$'' is wrong. Our corrected track matches the official table exactly \\
+Compute machine & Gene's machine & \textbf{This laptop is now the primary simulation and test machine}, with cloud GPU rented for training \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection*{What is still true}
+
+The durability study (Section~\ref{sec:stress}) stands, and its ranking is the most useful thing in
+this document: \textbf{command delay and thrust calibration dominate every other error source}, with
+camera field of view and camera tilt next. The gate-counting bug analysis (Section~\ref{sec:bug})
+stands and the fix is applied. The map-audit method stands. Plan~B's logic and speed budget stand,
+with the caveat that its numbers come from a purpose-built simulator, not from Isaac.
+
+\begin{warnbox}[The weight finding, stated carefully --- this one is easy to get wrong]
+The real drone is \SI{1745}{g}; the simulated one is \SI{607.6}{g}, an 8-inch airframe against a
+5-inch one. The obvious response --- ``change the mass in the simulator and retrain'' --- is
+\textbf{almost entirely wasted effort}, and doing it carelessly makes things worse.
+
+The simulator converts a throttle command into a force by multiplying by the drone's own mass:
+\code{thrust = (stick / hover\_stick) $\times$ mass $\times$ g}. Acceleration is force divided by
+mass, so the mass cancels out. Change only the mass and the simulated drone flies identically.
+
+Three things do \emph{not} cancel, and these are the real issues:
+\begin{enumerate}
+\item \textbf{Thrust-to-weight.} The simulator assumes the drone hovers at 25.5\,\% throttle, which
+implies it can produce 3.5 times its own weight in thrust. That is a \SI{600}{g} racing quad's
+figure. A \SI{1745}{g} machine carrying a Jetson more likely hovers near 35--45\,\%, i.e.\ about
+2.0--2.6 times its weight. If so, the simulator has been promising the policy acceleration the drone
+does not have. \textbf{Measuring this takes five minutes} (hover, read the throttle) and it is the
+single most valuable number available today. For scale: a \SI{10}{\%} thrust error on its own took
+crashes from about 2 to \textbf{58 per 100 gates} in the durability study.
+\item \textbf{Rotational inertia.} The real airframe resists being rotated roughly \textbf{11--16
+times} more than the simulated one (2.9$\times$ the mass, with arms about 2.2$\times$ longer, and
+inertia grows with the square of the arm). \textbf{Danger:} the simulator's rate loop uses a fixed
+gain \code{rate\_kp = 0.08}. If someone sets the real inertia and leaves that gain alone, the
+simulated drone becomes about 13$\times$ more sluggish than anything real, and every policy trained
+on it is worthless. That gain is not physics --- it stands in for Betaflight's own controller, which
+is retuned for whatever airframe it is on. It must be re-derived from a measured response:
+\code{gain $\approx$ inertia / measured response time}.
+\item \textbf{Air drag}, which the simulator does not model at all.
+\end{enumerate}
+\end{warnbox}
+
+\subsection*{The two gaps that block everything}
+
+\begin{enumerate}
+\item \textbf{Our flight client cannot talk to the real drone.} Searching the entire flight client
+for ``MSP'' returns nothing; \code{controller.py} speaks MAVLink to the virtual qualifier's
+simulator, which the real flight controller does not understand. \textbf{Much mitigated on 17
+September:} the organizers ship a complete MSP layer on the board (\S\ref{sec:provided}), so what
+remains is an adapter, the Betaflight curve inversion and the sign/axis mapping --- hours rather than
+days, and testable on a laptop against their fake flight controller. Still the critical path.
+
+\item \textbf{Nothing tells the drone which gate is next.} The policy's input includes a list of 18
+on/off flags meaning ``this is the gate you are going for''. In the simulator that came free, from
+the simulator. On the real course we must count gates ourselves from the camera --- and the double
+gate counts twice per lap, which is exactly where a counter loses its place.
+\end{enumerate}
+
+\begin{warnbox}[New on 17 September: the link may be slower than our policy]
+The organizers' software guide states, twice and emphatically, that the flight-controller link is
+\emph{telemetry-grade}: ``MSP is request/response over a 115200-baud serial line. You poll; the FC
+answers. Attitude at 30--50\,Hz is realistic; a hard real-time control loop is not.''
+
+Our policy runs at \textbf{60\,Hz} and takes gyro readings as part of its input. Sending stick
+commands at 60\,Hz is fine --- that is exactly what a radio link does, and Betaflight keeps the fast
+stabilisation loop internally, which is where it belongs. The problem is the \emph{feedback} half: if
+gyro only arrives at 30--50\,Hz, the simulator has been training the policy against a sensor faster
+than the one it will fly with.
+
+\textbf{Action:} measure the achievable rate on day one with the organizers' own
+\code{companion\_listener\_msp.py}, then set the simulator's decimation to match \emph{before}
+committing to a long training run. At 120\,Hz physics, decimation 2 gives 60\,Hz, 3 gives 40\,Hz and
+4 gives 30\,Hz.
+\end{warnbox}
+
+\subsection*{What the organizers already provide}\label{sec:provided}
+
+Everything below is pre-installed in \code{~/target/} on the Jetson. No pip, no network, no root.
+Log in over a USB cable: \code{ssh dcl@192.168.55.1}, password \code{dcl}.
+
+\begin{itemize}\sloppy
+\item \code{msp/msp.py} --- \code{MSPLink}: all MSP framing, plus \code{attitude()},
+\code{raw\_imu()}, \code{analog()}, \code{rc\_channels()}, \code{motors()}, \code{status()} and
+arming-blocker decoding. Thread-safe, background receive loop, counts corrupt frames rather than
+crashing on them.
+\item \code{msp/msp\_rc.py} --- \code{RCTransmitter}: streams stick commands at a fixed rate from a
+background thread \textbf{with a watchdog already built in}. Stop calling \code{set\_control()} and
+it falls back to an idle frame by itself. \code{arm()} refuses unless throttle is at minimum;
+\code{close()} disarms cleanly.
+\item \code{msp/fake\_fc.py} --- \textbf{simulates a Betaflight flight controller on a laptop}, with
+deliberate fault modes (frozen, saturated, wrong scale, no accelerometer, bus errors). The whole test
+suite runs with nothing plugged in.
+\item \code{msp/setup\_jetson\_uart.sh} --- frees the serial port from Linux's login console.
+\textbf{Run once per board before anything else}; skipping it looks exactly like a dead flight
+controller.
+\item \code{msp\_bench.py} (info / telemetry / rc / demo), \code{imu\_check.py} (a real functional
+IMU test, not just ``did it reply''), \code{companion\_listener\_msp.py} (live telemetry, and it
+reports the achievable poll rate).
+\item Camera: \code{live-view.py}, \code{live-view-pts.py} (hardware capture timestamps),
+\code{live-view-imu.py}, \code{show-camera.py}, \code{raw-view.py}, \code{frame-timestamps.py}, plus
+\code{bringup-check.sh} and \code{camera-bind-check.sh}.
+\end{itemize}
+
+The guide says it plainly: \textbf{``do not re-implement MSP framing.''}
+
+\textbf{First action for whoever reaches a board:} \code{scp -r dcl@192.168.55.1:~/target ./}, and
+share it --- that is what lets the rest of the team write and test adapter code without the drone.
+
+\begin{warnbox}[Three constraints from those guides that will otherwise cost an afternoon each]
+\begin{enumerate}
+\item \textbf{Only two of the camera's four data lanes are wired} on this carrier, capping resolution
+$\times$ framerate. Run \code{v4l2-ctl -d /dev/video0 -{}-list-formats-ext} and believe that list, not
+the datasheet. The \SI{75}{\degree} field of view is quoted for 1920$\times$1080 at 60\,fps.
+\item \textbf{The image processor needs a graphics context.} Colour, auto-exposure and white balance
+run in NVIDIA's ISP, which fails over a plain SSH session and falls back to a flat, dim software
+debayer. That is documented behaviour, not a broken camera.
+\item \textbf{No deep-learning framework is installed.} OpenCV (GStreamer-enabled), NumPy, pyserial
+and python3-gi --- no PyTorch. This makes the NumPy policy runtime \emph{mandatory}. And never
+\code{pip install opencv-python}: it silently replaces the GStreamer build and the camera pipeline
+then fails with no error text.
+\end{enumerate}
+There is also \textbf{no hardware sync wire between the camera and the flight controller}. Their
+guide calls its camera--IMU timing section ``the section most likely to save you a week''. It is
+right; read it before building anything that fuses the two.
+\end{warnbox}
+
+\subsection*{Where the working documents are}
+
+This PDF is the onboarding and history document. The live operational plan is kept as Markdown in
+the workspace root, because it changes daily:
+\code{FIELD\_PLAN.md} (workstreams, procedures, schedule, contingencies),
+\code{SIM\_MEASUREMENTS.md} (every parameter the simulator guesses and how to measure it),
+\code{INSTALL\_PLAN.md} (what to install and download, ordered by how badly it blocks us),
+\code{PLAN\_B.md} (the slow fallback).
+Sections~\ref{sec:gaps}--\ref{sec:schedule} of this document summarise them.
