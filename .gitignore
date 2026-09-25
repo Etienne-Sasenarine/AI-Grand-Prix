@@ -1,67 +1,72 @@
-# Python
+# Consolidated .gitignore for the AI Grand Prix repo.
+# One file at the root; per-subsystem .gitignores were merged in here.
+#
+# Policy: model weights are kept IN git on purpose (they are 6-13 MB each and
+# a checkpoint is only meaningful next to the code that produced it). We ignore
+# the large *regenerable output directories* instead of blanket-ignoring *.pt.
+# Kept deliberately: training/checkpoints/, perception/models/, deploy/runtime/models/.
+
+# ============================== Python ==============================
 __pycache__/
 *.py[cod]
 *.egg-info/
 .pytest_cache/
+.ipynb_checkpoints/
 
-# Virtualenv
+# ============================ Virtualenvs ===========================
 venv/
 .venv/
 .venv_mac/
 winvenv/
-# Local practice checkpoints (regenerated as you fly).
-practice/
+env/
 
-# Ignore run logs, but keep the published personal-best package
-# and the folder rules for anyone cloning the repo.
-logs/*
-!logs/README.md
-!logs/best/
-!logs/best/**
-logs/best/telem_best.csv
-logs/best/attitude_fast.json
-
-# Trained weights (large / regenerable)
-*.pt
-*.ckpt
-# Keep the Isaac PPO keepers and their training logs in-tree.
-!isaac_drone_racer/models/
-!isaac_drone_racer/models/**
-!isaac_drone_racer/**/*.pt
-!isaac_drone_racer/**/*.ckpt
-!isaac_drone_racer/logs/
-!isaac_drone_racer/logs/**
-!isaac_drone_racer/datasets/
-!isaac_drone_racer/datasets/**
-
-# Simulator install (large binary, not source)
-AIGP_3385/
-
-# Vision debug/capture output (regenerable)
-_vision_debug/
-frames/
-datasets/
-logs/*.csv
-logs/*.txt
-
-# Training artifacts (Dreamer / BC checkpoints — large, regenerable)
-artifacts/
-
-# YOLO / policy training output (checkpoints + plots, hundreds of MB, and
-# fully regenerable from datasets/ via tools/train_gate_pose.py)
-runs/
-
-# OS
+# =========================== OS / editor ============================
 .DS_Store
-# Windows reserved device name — accidental `> nul` redirects create this file
+# Windows reserved device name: accidental `> nul` redirects create this file
 # and `git add` then fails with "unable to index file 'nul'".
 nul
 NUL
 
-# inference/: keep the shipped gate-pose weights, ignore the local Roboflow
-# dataset the notebook trained on (frames/ is ~75 MB of JPGs + COCO json).
-inference/frames/
-!inference/best.pt
+# =============== Training (Isaac Lab) — large, regenerable ==========
+# A single PPO run writes gigabytes of TensorBoard events and checkpoints.
+training/logs/
+training/runs/
+training/outputs/
+training/models/
+training/eval/
+wandb/
+*.tfevents.*
+*.jsonl.gz
+# Isaac Sim / Omniverse scratch
+.nvidia-omniverse/
+kit/
+*.log
 
-# Dataset downloads (e.g. the Roboflow export): hundreds of MB, never for git
-*.zip
+# ================= Perception (YOLO) — datasets & runs ==============
+# The Roboflow dataset the notebook trained on (~75 MB of JPGs + COCO json).
+perception/frames/
+**/frames/
+datasets/
+runs/                      # ultralytics training output
+_vision_debug/
+
+# ==================== Deploy / bench output =========================
+hover_logs/
+deploy/**/hover_logs/
+bench_*.json
+bench_*_report.md
+logs/*.csv
+logs/*.txt
+
+# ================= Large binaries never for git =====================
+*.zip                      # dataset exports (Roboflow, etc.)
+*.bag                      # ROS bags
+*.mcap                     # MCAP recordings
+AIGP_3385/                 # Isaac Sim install
+
+# ================= LaTeX build products (docs/paper) ================
+docs/paper/neurips/*.aux
+docs/paper/neurips/*.log
+docs/paper/neurips/*.out
+docs/paper/neurips/*.toc
+docs/paper/neurips/paper.pdf
