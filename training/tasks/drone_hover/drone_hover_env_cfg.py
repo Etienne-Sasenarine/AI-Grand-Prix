@@ -1,0 +1,237 @@
+"""Station-keeping environment: hold position in front of a gate.
+
+Subclasses the racing config rather than restating it. Scene, observation,
+action, plant, events and the command term are inherited **unchanged** --
+that is not laziness, it is the requirement. A policy trained here is only
+useful as a racing seed if it saw the same vector, and only useful as a
+deployment test if it exercised the same perception path. Anything restated
+here is something that could drift.
+
+What changes is the objective. Racing pays for passing through the opening and
+for closing distance; this pays for being parked in front of it and still.
+"""
+
+from __future__ import annotations
+
+import os
+
+from isaaclab.managers import RewardTermCfg as RewTerm
+from isaaclab.managers import SceneEntityCfg
+from isaaclab.managers import TerminationTermCfg as DoneTerm
+from isaaclab.utils import configclass
+
+from tasks.drone_racer.drone_racer_env_cfg import (
+    DroneRacerEnvCfg,
+    DroneRacerEnvCfg_PLAY,
+)
+
+from . import mdp
+
+# Metres in front of the gate opening to hold. Close enough that the gate fills
+# a useful part of a 72.8 degree frame, far enough to drift without contact.
+STANDOFF_M = 2.0
+
+
+@configclass
+class HoverRewardsCfg:
+    """Hold the point, be still, stay upright, keep the gate in frame.
+
+    Weights are set so a perfectly parked episode earns roughly ten times what
+    a crashed one loses, and so no single shaping term can outbid actually
+    arriving. ``station_keep`` is the objective; everything else either rules
+    out a degenerate way of satisfying it or keeps the perception honest.
+    """
+
+    # Broad pull toward the hold point, with reach. station_keep alone has
+    # none -- a 0.75 m Gaussian is numerically zero past a few metres -- so
+    # without this a policy spawned anywhere but on the point has no gradient
+    # and the spawn has to be narrowed to compensate. Widening the reward
+    # instead is what lets the spawn scatter across the gate's visible region,
+    # which is how the aircraft will actually be handed over in a cage.
+    approach = RewTerm(
+        func=mdp.approach,
+        weight=0.6,
+        params={"command_name": "target", "std": 3.0, "standoff_m": STANDOFF_M},
+    )
+    # The objective. Gaussian on distance to the hold point.
+    station_keep = RewTerm(
+        func=mdp.station_keep,
+        weight=2.0,
+        params={"command_name": "target", "std": 0.75, "standoff_m": STANDOFF_M},
+    )
+    # Names the goal rather than shaping toward it: pays only when near *and*
+    # slow, so "close but orbiting" cannot collect most of the reward.
+    settled = RewTerm(
+        func=mdp.settled,
+        weight=3.0,
+        params={
+            "command_name": "target",
+            "radius_m": 0.30,
+            "speed_m_s": 0.30,
+            "standoff_m": STANDOFF_M,
+        },
+    )
+    # Without this, orbiting the hold point at speed scores as well as hovering.
+    # Squared m/s, so 1 m/s costs 0.4 per step against station_keep's max 2.0.
+    stillness = RewTerm(func=mdp.stillness, weight=-0.4)
+    # Weak: a quad holding station genuinely does tilt to cancel drift. This
+    # only rules out holding position while inverted.
+    upright = RewTerm(func=mdp.upright, weight=0.3)
+    # Rate damping, same term and weight the racing task uses.
+    ang_vel_l2 = RewTerm(func=mdp.ang_vel_l2, weight=-0.0001)
+    # The gate must stay framed, or the observation the policy is learning to
+    # use goes blind and the cage test proves nothing about perception.
+    gate_visible = RewTerm(
+        func=mdp.gate_visible,
+        weight=0.3,
+        params={"command_name": "target", "std": 0.55},
+    )
+    lookat = RewTerm(
+        func=mdp.lookat_next_gate,
+        weight=0.2,
+        params={"command_name": "target", "std": 0.5},
+    )
+    # A crash must dominate. At 2400 steps a flawless episode earns roughly
+    # +13000, so -100 is a real but not paralysing penalty -- the racing task
+    # learned the hard way that a termination cost 100x every dense term
+    # collapses the policy onto "do nothing".
+    terminating = RewTerm(func=mdp.is_terminated, weight=-100.0)
+
+
+@configclass
+class HoverTerminationsCfg:
+    """End on a crash, on drifting away, or on a broken state.
+
+    Deliberately missing the racing terminations: there is no gate to miss and
+    no course to finish. ``flyaway`` is tightened well below the racing value --
+    a station-keeping policy that has wandered 8 m has already failed, and
+    letting the episode run teaches it that failure is survivable.
+    """
+
+    time_out = DoneTerm(func=mdp.time_out, time_out=True)
+    collision = DoneTerm(
+        func=mdp.illegal_contact,
+        # 0.01 N, the same threshold the racing task uses -- a prop brushing a
+        # gate is a crash, and a higher bar lets contact go unnoticed.
+        params={"sensor_cfg": SceneEntityCfg("collision_sensor"), "threshold": 0.01},
+    )
+    flyaway = DoneTerm(
+        func=mdp.flyaway,
+        params={"distance": 8.0, "command_name": "target"},
+    )
+    nonfinite = DoneTerm(func=mdp.nonfinite_state)
+
+
+@configclass
+class DroneHoverEnvCfg(DroneRacerEnvCfg):
+    """Racing environment, station-keeping objective."""
+
+    rewards: HoverRewardsCfg = HoverRewardsCfg()
+    terminations: HoverTerminationsCfg = HoverTerminationsCfg()
+
+    def __post_init__(self) -> None:
+        super().__post_init__()
+        # Shorter than racing's 40 s. Holding station is a stationary problem:
+        # an episode either settles in the first few seconds or does not, and
+        # shorter episodes mean more resets per wall-clock hour, which is where
+        # the plant randomisation actually gets sampled.
+        self.episode_length_s = 15.0
+
+        # Start on the hold point, not after the previous gate.
+        #
+        # Inheriting the racing spawn looked like the conservative choice --
+        # same initial-state distribution, so the policy transfers -- and was
+        # wrong in a way that only running it showed. Racing puts the aircraft
+        # one metre past the gate it just passed, a full gate-spacing from the
+        # gate it is now targeting. ``station_keep`` is a Gaussian with a 0.75 m
+        # width, which at that range returns zero: no gradient, nothing to
+        # learn from. ``flyaway`` at 8 m then ended those episodes on step one,
+        # 40 of 64 of them, before the policy had acted at all.
+        #
+        # Both the reward and the termination radius are right for a station
+        # keeper. The spawn was the thing that did not belong, so it is the
+        # thing that changes. Gate choice stays random and the jitter stays on:
+        # the aircraft still sees every gate, and still has to correct a small
+        # offset rather than starting perfect.
+        # Racing's start distribution does not belong here.
+        #
+        # This class subclasses DroneRacerEnvCfg, so super().__post_init__()
+        # brings the racing start settings with it -- and when the competition
+        # pad was added to racing, 20% of *hover* episodes silently began
+        # spawning at that pad targeting G1. Hover's hold point is derived from
+        # the target gate, so those episodes were asked to station-keep from a
+        # racing start, and the task collapsed: episode length fell from 898
+        # steps to 26.
+        #
+        # Inheritance carries the parent's future changes, not just its present
+        # ones. Anything hover must not inherit has to be cleared explicitly.
+        self.commands.target.race_start_xy = None
+        self.commands.target.race_start_fraction = 0.0
+        self.commands.target.floor_start_fraction = 0.0
+
+        self.commands.target.start_at_run_in = True
+        self.commands.target.start_run_in_m = STANDOFF_M
+        # The episode starts below the hold point and climbs to it.
+        #
+        # Spawning *on* the hold point was the first fix for station_keep
+        # having no reach. It worked, and produced a policy that only knows how
+        # to hold from somewhere it is already holding -- no climb, no takeoff,
+        # nothing like how the aircraft is handed over in a cage.
+        #
+        # Both offsets below are applied before the aim heading is computed, so
+        # the gate stays in frame from every sampled start. From 2 m out and a
+        # foot off the floor the gate sits about 31 degrees up, inside the
+        # camera's -2.6 to +42.6 degree vertical window.
+        # Start low and climb. One foot off the floor to the gate's own centre
+        # height, sampled per episode, so the aircraft learns to *arrive* at a
+        # height rather than to perform one fixed ascent -- and sometimes it is
+        # already there and only has to hold.
+        #
+        # The floor of the range is deliberately not the floor of the arena:
+        # the collision termination fires at 0.01 N, so an aircraft resting on
+        # the ground would end its episode before acting.
+        self.commands.target.spawn_z_range = (0.30, 1.35)
+        # Horizontal scatter stays modest. The task is "go up and hold", not
+        # "fly across and hold", so the climb should be roughly vertical --
+        # but not identical every time, or the policy learns one trajectory
+        # instead of a controller.
+        self.commands.target.spawn_scatter_m = (0.8, 0.8, 0.0)
+
+        # Control rate, overridable so a rate-matched policy can be trained
+        # without forking the task.
+        #
+        # The deployed runner ticks at 40 Hz and this policy trains at 60, and
+        # measured on 2026-09-20 that mismatch is expensive: settled fell from
+        # 87.0% to 52.6% and the p95 excursion went 0.37 m -> 0.93 m. Pinning
+        # the delay line off separates the two causes -- 88.7% -> 66.1% is the
+        # rate itself, the remaining 66.1% -> 52.6% is the extra latency a
+        # slower loop brings. Two thirds of the damage is the rate, so no
+        # amount of latency engineering recovers it: the policy has to be
+        # trained at the rate it will fly, or flown at the rate it trained.
+        #
+        # Only the *policy* rate moves. Physics stays at 120 Hz, which is the
+        # honest model -- Betaflight's inner loop does not slow down because
+        # the companion computer does.
+        hz = os.environ.get("AIGP_HOVER_HZ")
+        if hz:
+            physics_hz = 1.0 / float(self.sim.dt)
+            decimation = physics_hz / float(hz)
+            if abs(decimation - round(decimation)) > 1e-6:
+                raise ValueError(
+                    f"AIGP_HOVER_HZ={hz} needs a whole decimation of the "
+                    f"{physics_hz:g} Hz physics tick; got {decimation:.4f}"
+                )
+            self.decimation = int(round(decimation))
+            self.sim.render_interval = self.decimation
+
+
+@configclass
+class DroneHoverEnvCfg_PLAY(DroneRacerEnvCfg_PLAY):
+    """Single-aircraft view for watching it hold, with the camera enabled."""
+
+    rewards: HoverRewardsCfg = HoverRewardsCfg()
+    terminations: HoverTerminationsCfg = HoverTerminationsCfg()
+
+    def __post_init__(self) -> None:
+        super().__post_init__()
+        self.episode_length_s = 60.0

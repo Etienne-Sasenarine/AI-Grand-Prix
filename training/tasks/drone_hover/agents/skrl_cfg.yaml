@@ -1,0 +1,120 @@
+# Station-keeping agent configuration.
+#
+# Hover shared the racing config until 20 Sep, which was right while the two
+# tasks behaved alike and wrong once they stopped. Racing still has a large
+# task gradient -- it was gaining a gate per half hour when it was stopped --
+# so its policy std shrinks on its own. Hover converges, the gradient goes
+# quiet, and whatever pressure is left decides what the policy does next.
+#
+# Measured over the same window, hover 20-53-55 against racing 20-53-52:
+#
+#   policy std   hover 0.6094 -> 0.6604  (+8.4%)   racing 0.5854 -> 0.5801 (-0.9%)
+#   learning rate hover 8.8e-5 -> 2.2e-4 (2.4x)    racing 7.0e-5 -> 9.4e-5 (1.3x)
+#   settled       hover 67.9% -> 61.8% over ~15 min, every reward term flat or falling
+#
+# Total return fell too, so this was not one term traded for another: the
+# policy was getting noisier, and `settled` is a hard threshold (within 0.30 m
+# AND under 0.30 m/s), so jitter falls off its edge while the wide Gaussian of
+# `station_keep` barely notices. The relative slopes match that exactly --
+# settled -0.50%/window against station_keep -0.11%/window.
+#
+# Two changes, both hover-only. Racing keeps the file it had.
+
+seed: 1
+
+
+# Models are instantiated using skrl's model instantiator utility
+# https://skrl.readthedocs.io/en/latest/api/utils/model_instantiators.html
+models:
+  # Shared trunk for policy and value. Separating them looks principled -- it
+  # stops high-variance value gradients reshaping the policy features -- but
+  # measured worse in a 2x2 ablation at 6k timesteps, twice:
+  #   lookahead on : shared 13.38 reward / 0.110 gates  vs separate 8.56 / 0.043
+  #   lookahead off: shared 12.79 reward / 0.088 gates  vs separate 8.06 / 0.037
+  # With separate networks the policy log_std also stayed pinned at the
+  # max_log_std ceiling instead of annealing, and a full 50k run on that setting
+  # went NaN and collapsed to hovering. Override with SEPARATE_NETS=1.
+  separate: False
+  policy:  # see gaussian_model parameters
+    class: GaussianMixin
+    clip_actions: False
+    clip_log_std: True
+    min_log_std: -20.0
+    max_log_std: 0.0   # exp(0)=1.0; exp(2)=7.39 let std pin at the ceiling
+    initial_log_std: 0.0
+    network:
+      - name: net
+        input: STATES
+        layers: [256, 256, 256]
+        activations: elu
+    output: ACTIONS
+  value:  # see deterministic_model parameters
+    class: DeterministicMixin
+    clip_actions: False
+    network:
+      - name: net
+        input: STATES
+        layers: [256, 256, 256]
+        activations: elu
+    output: ONE
+
+
+# Rollout memory
+# https://skrl.readthedocs.io/en/latest/api/memories/random.html
+memory:
+  class: RandomMemory
+  memory_size: -1  # automatically determined (same as agent:rollouts)
+
+
+# PPO agent configuration (field names are from PPO_DEFAULT_CONFIG)
+# https://skrl.readthedocs.io/en/latest/api/agents/ppo.html
+agent:
+  class: PPO
+  rollouts: 24
+  learning_epochs: 5
+  mini_batches: 4
+  discount_factor: 0.99
+  lambda: 0.95
+  learning_rate: 1.0e-04
+  learning_rate_scheduler: KLAdaptiveLR
+  learning_rate_scheduler_kwargs:
+    kl_threshold: 0.01
+    # KLAdaptiveLR raises the rate whenever KL falls below kl_threshold/2, and
+    # a converged stationary task sits there permanently. skrl's default
+    # max_lr is 1e-2, a hundred times the base, so nothing stopped it climbing
+    # to 2.4x. Capping at the base rate lets the scheduler cut when an update
+    # is too aggressive and never amplify when it is not.
+    max_lr: 1.0e-04
+  state_preprocessor: RunningStandardScaler
+  state_preprocessor_kwargs: null
+  value_preprocessor: RunningStandardScaler
+  value_preprocessor_kwargs: null
+  random_timesteps: 0
+  learning_starts: 0
+  grad_norm_clip: 1.0
+  ratio_clip: 0.2
+  value_clip: 0.2
+  clip_predicted_values: True
+  # No exploration bonus. Station keeping has one optimal action per state,
+  # so once the task gradient is spent there is nothing for entropy pressure to
+  # buy -- it just grows log_std, and the inflated LR below amplified it. 0.005
+  # was cut to 0.001 for this same reason and it was not enough.
+  entropy_loss_scale: 0.0
+  value_loss_scale: 1.0
+  kl_threshold: 0.0
+  rewards_shaper_scale: 0.6
+  time_limit_bootstrap: False
+  # logging and checkpoint
+  experiment:
+    directory: "drone_racer"   # shared tree; run type is read from params/env.yaml
+    experiment_name: ""
+    write_interval: auto
+    checkpoint_interval: auto
+
+
+# Sequential trainer
+# https://skrl.readthedocs.io/en/latest/api/trainers/sequential.html
+trainer:
+  class: SequentialTrainer
+  timesteps: 50000
+  environment_info: log

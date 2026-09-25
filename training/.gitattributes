@@ -1,0 +1,15 @@
+# Only files large enough to be worth it. The drone's base USD alone is 98 MB
+# of baked geometry and git has no business storing deltas of it.
+#
+# Deliberately NOT here: .dae, .glb, .obj. Ours are a few kilobytes each, and
+# routing tiny files through LFS buys nothing while adding a way for a clone to
+# arrive with pointer files and no content.
+*.usd   filter=lfs diff=lfs merge=lfs -text
+*.usda  filter=lfs diff=lfs merge=lfs -text
+*.png   filter=lfs diff=lfs merge=lfs -text
+*.jpg   filter=lfs diff=lfs merge=lfs -text
+*.pt    filter=lfs diff=lfs merge=lfs -text
+
+# The flight repo is edited on Windows and some vendored files carry CRLF.
+# Normalising would show every line of those files as changed on first commit.
+* -text

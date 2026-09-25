@@ -1,0 +1,15 @@
+PLACEHOLDER -- original content is missing upstream.
+
+This file arrived from AI_GP/isaac_drone_racer as a Git LFS pointer whose
+object does not exist on that remote (git lfs pull returns 404). The content is
+gone, not merely un-fetched.
+
+Nothing in the training path loads this file; the USD assets are real and carry
+baked geometry. It is needed only to regenerate the drone asset from
+5_in_drone.urdf. If you need it, ask whoever committed it originally -- it is
+most likely still on their disk.
+
+Kept as plain text rather than as the original pointer so it cannot be mistaken
+for a fetchable LFS object, and so pushes do not fail trying to upload it.
+
+See assets/BROKEN_LFS_OBJECTS.md.

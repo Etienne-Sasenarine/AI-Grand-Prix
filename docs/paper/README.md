@@ -1,0 +1,64 @@
+# The paper
+
+![](figures/stack_pov.gif)
+
+*Ten seconds of `videos/stack_run_02.mp4`: the classical fallback stack in Isaac, chase view (left) and the drone's own camera with the simulated detector's corners (right). The five full recordings are listed below.*
+
+`paper.md` is the write-up of the whole AI Grand Prix physical-qualifier effort:
+the perception pipeline, the simulator and training stack, the measurements
+taken on the aircraft, and the sequence of failures that ended the attempt.
+It is the one source. `paper.pdf` is the typeset rendering: `md2tex.py`
+converts the Markdown to `neurips/paper.tex` and `pdflatex` sets it using the
+NeurIPS style file for its page layout only (`neurips/neurips_2025.sty`; the
+conference footer is replaced with a note that this is a team write-up, not a
+submission). Charts go in as vector PDFs, so their text is selectable.
+
+`videos/` holds the five recordings the paper links to (63 MB, plain files,
+not LFS):
+
+| file | what it shows |
+|---|---|
+| `race_start_from_pad.mp4` | the 40 Hz racing policy taking off from the competition pad and passing gate 1 (Isaac, 6.7 s) |
+| `race_best.mp4` | an early chase-camera run from before the start fixes (Isaac, 9.9 s); that checkpoint had not trained a takeoff from this position and does not complete the course. To be replaced by a `race40drop` recording |
+| `stack_run_01..03.mp4` | the classical fallback stack in Isaac: chase view on the left, the drone's own camera with the simulated detector's corners on the right (60 s each) |
+
+## Rebuilding it
+
+    python3 make_figures.py     # regenerates the charts from the numbers and logs cited in the paper
+    python3 make_figures_extra.py   # the system diagram, timeline, course map, label funnel, stress causes, contract layout
+    AIGP_FIG_THEME=dark python3 make_figures.py && AIGP_FIG_THEME=dark python3 make_figures_extra.py   # dark variants for the README
+    ~/dev/ai-grand-prix/.venv_mac/bin/python make_gifs.py dump && python3 make_gifs.py assemble   # the animated clips
+    python3 md2tex.py && (cd neurips && pdflatex paper.tex && pdflatex paper.tex) && cp neurips/paper.pdf paper.pdf
+
+`make_figures.py` reads the team's recorded numbers (session notes, bench
+findings, checkpoint provenance), the 18 Sep telemetry CSV, the TensorBoard
+event files of the pre-event training runs (via `tfevents.py`, a
+dependency-free reader), the briefing's vector figures, and the onboard camera
+captures and detector galleries. Those sources live in the flight repo and on
+the team laptop, not here; the generated PNGs are committed so the paper
+renders on GitHub without them. Each chart is also saved as `.svg` and `.pdf`
+with live text; the LaTeX build uses the PDFs, so chart text is selectable. Titles and encodings
+live in the captions, not inside the images.
+
+## Figures
+
+| file | what it is |
+|---|---|
+| `course_overlay.png`, `camera_fov.png`, `stress_results.png`, `retrain_curves.png`, `bug_ab.png`, `planb_tradeoff.png` | from the 17 Sep engineering journal (`pq/briefing/figs`), rasterised |
+| `pq_speed_best_play.png` | the pre-event keeper policy in playback, 19 Sep |
+| `training_history.png` | `gate_passed` reward over the 4–6 Sep run lineage, parsed from TensorBoard events |
+| `hover_stress_sweep.png`, `rate_40_vs_60.png` | hover and racing numbers from the 20–21 Sep session notes |
+| `msp_link_timing.png`, `rate_map_error.png` | bench measurements on the aircraft, 21 Sep (`pq/flight/FINDINGS_*.md`) |
+| `baro_collapse.png` | `pq/logs/orin/hover_20260918_003956.csv` |
+| `perception_numbers.png`, `close_gate_models.png` | numbers from `aigp-perception` READMEs and the 21 Sep live comparison |
+| `what_the_drone_sees.png`, `detector_ab_gallery.png` | onboard camera frames, auto-label overlays and the model A/B gallery |
+| `stack_sim_paths.png` | the classical fallback stack flown in Isaac, 21 Sep |
+| `race_contact_sheet.jpg` | the racing policy's onboard camera in Isaac, 20 Sep |
+| `video_posters.png`, `poster_*.jpg` | one frame from each recording in `videos/` (extracted with OpenCV) |
+| `course_map.png` | the course from the simulator's gate table: frames, directions, route, leg lengths |
+| `figures/dark/*.png` | dark-theme variants of the charts, served by the repo README through `<picture>` (`AIGP_FIG_THEME=dark`) |
+| `system_diagram.png`, `project_timeline.png`, `observation_contract.png` | drawn from the documents: the chain from camera to motors with measured rates, the four-month timeline with the on-site week, the 55 x 32 observation layout (`make_figures_extra.py`) |
+| `autolabel_funnel.png` | `datasets/autolabel/report.csv` and `datasets/hybrid/report.csv` in the flight repo (2467 candidates, 1917 hybrid labels) |
+| `stress_causes.png` | the 28 stress-scenario JSONs under `analysis/2026-09-16/experiments/results/stress/` |
+| `race40drop_first_lap.png` | the race40drop first-lap figure from the pod session of 21 Sep (36 of 64 aircraft completed the lap); the original file did not survive the pod, this is the team's copy |
+| `race_start_from_pad.gif`, `race_best.gif`, `stack_pov.gif` (+ `_still.png`) | animated clips of the three recordings for inline display on GitHub, and one frame of each for the PDF (`make_gifs.py`: OpenCV frames, Pillow GIF) |
