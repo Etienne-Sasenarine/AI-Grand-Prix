@@ -1,6 +1,6 @@
 """Record a whole flight with nothing attached. No laptop, no SSH, no Wi-Fi.
 
-    python3 flight_recorder.py --dev /dev/ttyTHS1 --out /home/dcl/flights
+    python3 flight_recorder.py --dev /dev/ttyTHS1 --out ./flights
     python3 flight_recorder.py --install          # start automatically at boot
 
 Why this exists

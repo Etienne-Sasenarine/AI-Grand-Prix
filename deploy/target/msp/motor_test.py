@@ -12,7 +12,15 @@ import struct
 import sys
 import time
 
-sys.path.insert(0, '/home/dcl/target/msp')
+import os  # noqa: E402
+from pathlib import Path as _Path  # noqa: E402
+# MSP library location: prefer the in-repo copy under deploy/target/msp, fall
+# back to the Jetson install, overridable via AIGP_MSP_DIR.
+# (Was hardcoded to /home/dcl/target/msp.)
+_here = _Path(__file__).resolve()
+_msp_candidates = ([os.environ["AIGP_MSP_DIR"]] if os.environ.get("AIGP_MSP_DIR") else [])
+_msp_candidates += [str(_here.parent), str(_here.parents[1] / "target" / "msp"), "/home/dcl/target/msp"]
+sys.path.insert(0, next((c for c in _msp_candidates if _Path(c, "msp.py").exists()), _msp_candidates[-1]))
 from msp import MSPLink
 
 STOP = struct.pack('<8H', *([1000] * 8))
