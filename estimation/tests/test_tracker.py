@@ -23,7 +23,9 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+_here = Path(__file__).resolve()
+_root = next(p for p in _here.parents if (p / "estimation").is_dir() and (p / "deploy").is_dir())
+sys.path[:0] = [str(_root / "estimation"), str(_root / "deploy" / "runtime")]
 
 import geometry as G  # noqa: E402
 import gate_tracker as T  # noqa: E402

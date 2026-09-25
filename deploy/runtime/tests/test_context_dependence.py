@@ -31,14 +31,16 @@ from pathlib import Path
 
 import numpy as np
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+_here = Path(__file__).resolve()
+_root = next(p for p in _here.parents if (p / "estimation").is_dir() and (p / "deploy").is_dir())
+sys.path[:0] = [str(_root / "estimation"), str(_root / "deploy" / "runtime")]
 
 import geometry as G  # noqa: E402
 import observation as O  # noqa: E402
 import sim as S  # noqa: E402
 from policy_runtime import NumpyPolicy  # noqa: E402
 
-MODEL = Path(__file__).resolve().parent / "models" / "pq_speed_best.npz"
+MODEL = Path(__file__).resolve().parent.parent / "models" / "pq_speed_best.npz"
 N_GATES = 18
 CTX_START = 32  # context block begins at index 32 within each 51-number frame
 FRAME = 51
