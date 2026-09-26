@@ -12,11 +12,11 @@ are the FP32 PyTorch weights (`../models/*.pt`) and an ONNX export
 3. **Build engine** — ONNX → TensorRT `.engine` with INT8 (FP16 fallback),
    targeting the Orin's GPU. *(TODO)*
 4. **Validate** — compare quantized vs FP32 keypoint accuracy and per-frame
-   latency **on the Orin**, and record both in the README results table with the
+   latency **on the Orin**, and record both in the paper (`docs/paper/`) with the
    hardware named. *(TODO)*
 
 ## Notes
 - Keep engines out of git — they are hardware/TensorRT-version specific and
   regenerable. Add them to `tools/download_models.sh` if they need distributing.
-- Do not commit measured latency/accuracy numbers here; put them in the top-level
-  results table against the exact hardware.
+- Do not commit measured latency/accuracy numbers here; put them in the
+  paper, against the exact hardware they were measured on.
