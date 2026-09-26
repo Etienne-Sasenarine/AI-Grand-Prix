@@ -1,6 +1,6 @@
 # AI Grand Prix
 
-**An autonomous drone-racing stack built for the AI Grand Prix physical qualifier** (Anduril LC3, Santa Ana, September 2026). A deep-RL flight policy trained in Isaac Lab flies through gates that a YOLO pose model finds in the camera image, using a vision–inertial state estimate, all running onboard an NVIDIA Jetson Orin NX.
+**An autonomous drone-racing stack built for the Anduril AI Grand Prix physical qualifier**. A deep-RL flight policy trained in Isaac Lab flies through gates that a YOLO pose model finds in the camera image, using a vision–inertial state estimate, all running onboard an NVIDIA Jetson Orin NX.
 
 This repository brings the three subsystems (simulation and training, perception, and the onboard flight client) into one project, with the full git history of each preserved. The whole effort is written up in [the paper](docs/paper/paper.md) ([PDF](docs/paper/paper.pdf)).
 
@@ -22,7 +22,7 @@ This repository brings the three subsystems (simulation and training, perception
 
 ---
 
-## In action
+## On Drone
 
 ### Gate detection on real camera frames
 
