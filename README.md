@@ -107,7 +107,7 @@ The paper's rendered system diagram is at [`docs/paper/figures/system_diagram.pn
 | Path | Subsystem | Contents |
 |---|---|---|
 | [`training/`](training) | **Simulation & RL training** | Isaac Sim / Isaac Lab / skrl PPO stack: race and hover tasks, plant/dynamics, observation contract, drone and gate assets, tests, trained checkpoints. |
-| [`perception/`](perception) | **Gate detection (YOLO)** | Fine-tuned YOLOv8n-pose gate-corner detector, `GateDetector` library + CLI, training notebook, shipped weights. |
+| [`perception/`](perception) | **Gate detection (YOLO)** | Fine-tuned YOLOv8n-pose gate-corner detector, `GateDetector` library + CLI, shipped weights. |
 | [`estimation/`](estimation) | **Vision–inertial estimation** | Gate PnP, pose filter and gate tracker that fuse detections with the IMU into a state estimate. |
 | [`deploy/`](deploy) | **Jetson Orin runtime** | `runtime/` closed-loop flight client, `target/` camera + MSP/IMU link + provisioning, `orin-setup/` bench scripts. |
 | [`tools/`](tools) | **Bench & analysis** | Flight recorders, telemetry decoding, analysis utilities, `download_models.sh`. |

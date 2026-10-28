@@ -7,7 +7,6 @@ Detects racing gates from the drone's camera and localises their 8 corners
 ## Contents
 * `best.pt` – fine-tuned YOLOv8n-pose, 1 class (`gate`), 8 keypoints per gate
 * `inference.py` – `GateDetector` library class + CLI for images / video / webcam
-* `AI_GP_Yolo_Model.ipynb` – notebook used to build the dataset and train the model
 
 Keypoint order: `out_UL, out_UR, out_BR, out_BL, in_UL, in_UR, in_BR, in_BL`.
 
